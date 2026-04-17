@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional, url format)
+    //   - role: string (required, ['admin', 'user'])
+    //   - phoneNumber: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: bookings
+    // Document ID: {bookingId}
+    // Fields:
+    //   - userId: string (required)
+    //   - userName: string (required)
+    //   - userPhone: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - startTime: string (required, HH:mm)
+    //   - endTime: string (required, HH:mm)
+    //   - status: string (required, ['pending', 'confirmed', 'cancelled', 'paid'])
+    //   - price: number (required, positive)
+    //   - paymentMethod: string (optional, ['bkash', 'nagad', 'rocket'])
+    //   - transactionId: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: pricing
+    // Document ID: {pricingId}
+    // Fields:
+    //   - dayType: string (required, ['weekday', 'weekend'])
+    //   - startTime: string (required, HH:mm)
+    //   - endTime: string (required, HH:mm)
+    //   - price: number (required, positive)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email == 'imtiajulrivu@gmail.com' && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/config/main) && request.auth.token.email == get(/databases/$(database)/documents/config/main).data.superAdminEmail && request.auth.token.email_verified == true));
+    }
+
+    function isModerator() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    function isStaff() {
+      return isAdmin() || isModerator();
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDate(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidTime(timeStr) {
+      return timeStr is string && timeStr.matches("^\\d{2}:\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'moderator', 'user'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBooking(data) {
+      let requiredFields = ['userId', 'userName', 'userPhone', 'date', 'startTime', 'endTime', 'status', 'price', 'createdAt'];
+      let optionalFields = ['advanceAmount', 'couponCode', 'discountAmount', 'paymentMethod', 'transactionId'];
+      
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(requiredFields.concat(optionalFields)) &&
+             data.userId is string &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
+             data.userPhone is string && data.userPhone.size() >= 10 && data.userPhone.size() <= 20 &&
+             isValidDate(data.date) &&
+             isValidTime(data.startTime) &&
+             isValidTime(data.endTime) &&
+             data.status in ['pending', 'confirmed', 'cancelled', 'paid'] &&
+             data.price is number && data.price >= 0 &&
+             (!('advanceAmount' in data) || data.advanceAmount is number) &&
+             (!('discountAmount' in data) || data.discountAmount is number) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPricing(data) {
+      return data.keys().hasAll(['dayType', 'startTime', 'endTime', 'price']) &&
+             data.dayType in ['weekday', 'weekend'] &&
+             isValidTime(data.startTime) &&
+             isValidTime(data.endTime) &&
+             data.price is number && data.price > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && 
+                      request.resource.data.role == resource.data.role || isAdmin();
+      allow delete: if isAdmin() && resource.data.email != get(/databases/$(database)/documents/config/main).data.superAdminEmail && uid != request.auth.uid;
+    }
+
+    match /config/{configId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.token.email == 'imtiajulrivu@gmail.com' && request.auth.token.email_verified == true;
+      allow update: if isAuthenticated() && (request.auth.token.email == resource.data.superAdminEmail || request.auth.token.email == 'imtiajulrivu@gmail.com') && request.auth.token.email_verified == true;
+    }
+
+    match /bookings/{bookingId} {
+      // Allow public read for availability check on the calendar
+      allow read: if true; 
+      
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.status == 'pending';
+                      
+      allow update: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                      (
+                        (isOwner(resource.data.userId) && 
+                         request.resource.data.userId == resource.data.userId &&
+                         (request.resource.data.status == 'cancelled' || request.resource.data.status == resource.data.status)) ||
+                        isStaff()
+                      );
+      allow delete: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      // Allow authenticated users to see coupons, and public validation via query
+      allow read: if isAuthenticated() || (request.query.limit <= 5);
+      allow write: if isStaff();
+    }
+
+    match /pricing/{pricingId} {
+      allow read: if true;
+      allow write: if isStaff() && isValidPricing(request.resource.data);
+    }
+  }
+}

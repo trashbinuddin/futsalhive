@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  
+  --color-hive-yellow: #FFCC00;
+  --color-hive-black: #0A0A0A;
+  --color-hive-green: #2ecc71;
+  --color-hive-dark-green: #064e3b;
+  
+  --color-glass: rgba(255, 255, 255, 0.07);
+  --color-glass-border: rgba(255, 255, 255, 0.12);
+}
+
+@layer base {
+  body {
+    @apply bg-hive-black text-[#F5F5F5] font-sans antialiased min-h-screen relative;
+    background-image: 
+      radial-gradient(circle at 80% 20%, rgba(255, 204, 0, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 20% 80%, rgba(46, 204, 113, 0.15) 0%, transparent 40%);
+  }
+
+  body::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l25.98 15v30L30 60 4.02 45V15z' fill-rule='evenodd' stroke='%23ffffff' stroke-width='0.5' fill='none' opacity='0.05'/%3E%3C/svg%3E");
+    z-index: -1;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold tracking-tight;
+  }
+}
+
+.glass-card {
+  @apply bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-2xl;
+}
+
+.hive-gradient {
+  background: linear-gradient(135deg, #FFCC00 0%, #d97706 100%);
+}
+
+.turf-gradient {
+  background: linear-gradient(135deg, #2ecc71 0%, #064e3b 100%);
+}
+
+.card-title-hive {
+  @apply text-lg font-bold mb-4 border-l-4 border-hive-yellow pl-3;
+}
+
