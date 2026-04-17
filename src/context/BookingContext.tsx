@@ -49,6 +49,7 @@ interface BookingContextType {
 const BookingContext = createContext<BookingContextType | undefined>(undefined);
 
 import { sendTelegramNotification, formatBookingMessage } from '../services/telegramService';
+import { sendToGoogleSheets } from '../services/googleSheetsService';
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
   const [pricing, setPricing] = useState<Pricing[]>([]);
@@ -106,6 +107,9 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       // Notify via Telegram
       const newMessage = formatBookingMessage({ ...booking, id: docRef.id }, 'new');
       await sendTelegramNotification(newMessage);
+
+      // Sync to Google Sheets
+      await sendToGoogleSheets({ ...booking, id: docRef.id });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'bookings');
     }
@@ -120,6 +124,9 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       if (booking) {
         const updateMessage = formatBookingMessage({ ...booking, status }, 'update');
         await sendTelegramNotification(updateMessage);
+        
+        // Sync to Google Sheets with new status
+        await sendToGoogleSheets({ ...booking, status });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `bookings/${id}`);

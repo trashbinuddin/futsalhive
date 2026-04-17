@@ -8,9 +8,9 @@ import { cn } from '../lib/utils';
 import { FUTSAL_HIVE_LOGO } from '../lib/constants';
 
 const TIME_SLOTS = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
-  '20:00', '21:00', '22:00', '23:00', '00:00', '01:00'
+  '06:00', '07:30', '09:00', '10:30', '12:00',
+  '13:30', '15:00', '16:30', '18:00', '19:30',
+  '21:00', '22:30', '00:00'
 ];
 
 export default function BookingCalendar() {
@@ -92,7 +92,7 @@ export default function BookingCalendar() {
       setIsSubmitting(true);
       setBookingError(null);
       
-      const endTimeSlot = TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot) + 1] || '02:00';
+      const endTimeSlot = TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot) + 1] || '01:30';
       
       await createBooking({
         userId: user.uid,
@@ -129,7 +129,7 @@ export default function BookingCalendar() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="max-w-4xl mx-auto px-2 sm:px-4 py-6 md:py-12">
       <div className="text-center mb-12">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -148,13 +148,13 @@ export default function BookingCalendar() {
         <p className="text-white/60">Select your preferred date and time to start the game.</p>
       </div>
 
-      <div className="glass-card p-8">
+      <div className="glass-card p-4 md:p-8">
         <div className="card-title-hive text-white uppercase tracking-wider">Booking Portal ⚡</div>
         
         {step === 'select' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* Date Selection */}
-            <div className="flex gap-4 overflow-x-auto pb-4 mb-8 scrollbar-hide">
+            <div className="flex gap-2 sm:gap-4 overflow-x-auto pb-4 mb-6 sm:mb-8 scrollbar-hide snap-x snap-mandatory">
               {next7Days.map((date) => (
                 <button
                   key={date.toISOString()}
@@ -163,7 +163,7 @@ export default function BookingCalendar() {
                     setSelectedSlot(null);
                   }}
                   className={cn(
-                    "flex-shrink-0 w-24 py-4 rounded-2xl border transition-all flex flex-col items-center gap-1",
+                    "flex-shrink-0 w-20 sm:w-24 py-3 sm:py-4 rounded-2xl border transition-all flex flex-col items-center gap-1 snap-center",
                     isSameDay(date, selectedDate)
                       ? "bg-hive-yellow border-transparent text-hive-black font-bold shadow-lg shadow-hive-yellow/20"
                       : "bg-black/30 border-white/10 text-gray-400 hover:border-hive-yellow/50"
@@ -176,7 +176,7 @@ export default function BookingCalendar() {
             </div>
 
             {/* Slot Selection */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
               {TIME_SLOTS.map((slot) => {
                 const booked = isSlotBooked(slot);
                 const selected = selectedSlot === slot;
@@ -188,7 +188,7 @@ export default function BookingCalendar() {
                     disabled={booked}
                     onClick={() => setSelectedSlot(slot)}
                     className={cn(
-                      "p-3 rounded-xl border transition-all text-center relative overflow-hidden group",
+                      "p-2 sm:p-3 rounded-xl border transition-all text-center relative overflow-hidden group",
                       booked 
                         ? "bg-red-500/10 border-red-500/20 text-red-500/50 cursor-not-allowed"
                         : selected
@@ -197,7 +197,10 @@ export default function BookingCalendar() {
                     )}
                   >
                     <div className="text-base font-display font-bold">{slot}</div>
-                    <div className={cn("text-[9px] uppercase tracking-wider", selected ? "text-hive-black/70" : "text-gray-500")}>
+                    <div className={cn("text-[9px] uppercase tracking-wider", selected ? "text-hive-black/80 font-bold" : "text-white/40")}>
+                      - {TIME_SLOTS[TIME_SLOTS.indexOf(slot) + 1] || '01:30'}
+                    </div>
+                    <div className={cn("text-[9px] uppercase tracking-wider mt-1", selected ? "text-hive-black/70" : "text-gray-500")}>
                       {booked ? 'Booked' : `৳${price}`}
                     </div>
                   </button>
@@ -230,7 +233,7 @@ export default function BookingCalendar() {
                 <div className="bg-black/30 p-4 rounded-xl border border-white/10">
                   <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Selected Slot 📅</span>
                   <div className="text-xl font-display font-bold text-white mt-1">
-                    {format(selectedDate, 'MMMM dd, yyyy')} @ {selectedSlot}
+                    {format(selectedDate, 'MMMM dd, yyyy')} | {selectedSlot} - {TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot!) + 1] || '01:30'}
                   </div>
                 </div>
                 <div className="bg-black/30 p-4 rounded-xl border border-white/10">
@@ -274,12 +277,12 @@ export default function BookingCalendar() {
                     className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors"
                   />
                 </div>
-                <div className="flex gap-4 pt-4">
-                  <button onClick={() => setStep('select')} className="flex-1 text-gray-400 font-bold hover:text-white transition-colors text-sm uppercase tracking-wider">Back</button>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4">
+                  <button onClick={() => setStep('select')} className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none">Back</button>
                   <button 
                     disabled={!phone || phone.length < 11}
                     onClick={() => setStep('otp')} 
-                    className="flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
+                    className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
                   >
                     Verify Phone 🔐
                   </button>
@@ -306,12 +309,12 @@ export default function BookingCalendar() {
               className="w-48 mx-auto block bg-black/30 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-display font-bold text-hive-yellow tracking-[0.5em] focus:outline-none focus:border-hive-yellow transition-colors"
             />
 
-            <div className="flex gap-4 pt-4 max-w-xs mx-auto">
-              <button onClick={() => setStep('confirm')} className="flex-1 text-gray-400 font-bold hover:text-white transition-colors text-sm uppercase tracking-wider">Back</button>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4 max-w-sm mx-auto">
+              <button onClick={() => setStep('confirm')} className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none">Back</button>
               <button 
                 disabled={otp !== '123456'}
                 onClick={() => setStep('payment')} 
-                className="flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
+                className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
               >
                 Verify & Pay 💳
               </button>
@@ -401,18 +404,18 @@ export default function BookingCalendar() {
               </div>
             </div>
 
-            <div className="flex gap-4 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4">
               <button 
                 disabled={isSubmitting}
                 onClick={() => setStep('otp')} 
-                className="flex-1 text-gray-400 font-bold hover:text-white transition-colors text-sm uppercase tracking-wider disabled:opacity-50"
+                className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider disabled:opacity-50 bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none"
               >
                 Back
               </button>
               <button 
                 disabled={!transactionId || isSubmitting}
                 onClick={handleBooking} 
-                className="flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95 flex items-center justify-center gap-2"
+                className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
