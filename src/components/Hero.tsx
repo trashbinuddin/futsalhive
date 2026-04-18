@@ -28,7 +28,7 @@ export default function Hero() {
       <div className="absolute inset-0 z-0">
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-hive-yellow/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-hive-green/10 rounded-full blur-[120px]" />
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000')] bg-cover bg-center opacity-20" />
+        <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/stadium_main/1920/1080')] bg-cover bg-center opacity-20" />
         <div className="absolute inset-0 bg-gradient-to-b from-hive-black via-hive-black/80 to-hive-black" />
       </div>
 

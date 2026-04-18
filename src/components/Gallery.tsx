@@ -4,32 +4,32 @@ import { Zap } from 'lucide-react';
 
 const IMAGES = [
   {
-    url: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0266698151.firebasestorage.app/o/performance.jpg?alt=media",
+    url: "https://picsum.photos/seed/football1/800/600",
     title: "Elite Performance",
     category: "Action"
   },
   {
-    url: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0266698151.firebasestorage.app/o/slot_price.jpg?alt=media",
-    title: "Slot Pricing",
+    url: "https://picsum.photos/seed/arena_night/800/600",
+    title: "Night Match",
     category: "Promotions"
   },
   {
-    url: "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0266698151.firebasestorage.app/o/easy_location.jpg?alt=media",
+    url: "https://picsum.photos/seed/sports_facility/800/600",
     title: "Easy Location",
     category: "Facilities"
   },
   {
-    url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80",
+    url: "https://picsum.photos/seed/stadium_main/800/600",
     title: "Main Arena",
     category: "Night Match"
   },
   {
-    url: "https://images.unsplash.com/photo-1510531704581-5b2870972060?auto=format&fit=crop&q=80",
+    url: "https://picsum.photos/seed/training_session/800/600",
     title: "Elite Training",
     category: "Action"
   },
   {
-    url: "https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&q=80",
+    url: "https://picsum.photos/seed/golden_futsal/800/600",
     title: "Golden Hour Vibes",
     category: "Atmosphere"
   }
