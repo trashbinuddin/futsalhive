@@ -8,7 +8,7 @@ export default function Contact() {
       <div className="grid lg:grid-cols-2 gap-16 items-center">
         <div>
           <h2 className="text-5xl font-display font-black text-white mb-6 tracking-tighter uppercase">
-            GET IN <span className="text-hive-yellow">TOUCH ⚡</span>
+            GET IN <span className="text-hive-yellow">TOUCH</span>
           </h2>
           <p className="text-white/60 text-lg mb-10 leading-relaxed">
             Have questions about bookings or events? Reach out to us. 
@@ -26,7 +26,7 @@ export default function Contact() {
                 <MapPin size={24} />
               </div>
               <div>
-                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Location 📍</h4>
+                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Location</h4>
                 <p className="text-white/40 text-sm">China Project, Aftabnagar, Dhaka, Bangladesh</p>
                 <span className="text-[10px] text-hive-yellow font-black uppercase tracking-widest mt-1 block">Open in Maps ↗</span>
               </div>
@@ -39,7 +39,7 @@ export default function Contact() {
                 <Phone size={24} />
               </div>
               <div>
-                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Phone 📞</h4>
+                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Phone</h4>
                 <p className="text-white/40 text-sm hover:text-hive-yellow transition-colors">+880 1894 43 3325</p>
                 <span className="text-[10px] text-hive-yellow font-black uppercase tracking-widest mt-1 block">Click to Call ↗</span>
               </div>
@@ -54,7 +54,7 @@ export default function Contact() {
                 <MessageCircle size={24} />
               </div>
               <div>
-                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">WhatsApp 💬</h4>
+                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">WhatsApp</h4>
                 <p className="text-white/40 text-sm">+880 1894 43 3325</p>
                 <span className="text-[10px] text-green-500 font-black uppercase tracking-widest mt-1 block">Message Us ↗</span>
               </div>
@@ -64,7 +64,7 @@ export default function Contact() {
                 <Mail size={24} />
               </div>
               <div>
-                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Email ✉️</h4>
+                <h4 className="text-white font-bold mb-1 uppercase tracking-wider">Email</h4>
                 <p className="text-white/40 text-sm">info@futsalhive.com</p>
               </div>
             </div>

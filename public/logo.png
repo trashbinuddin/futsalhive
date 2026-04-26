@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M256 64L106 128V256C106 354 170 442 256 480C342 442 406 354 406 256V128L256 64Z" fill="#0A1010"/>
+<path d="M256 74L116 134V256C116 340 172 420 256 470C340 420 396 340 396 256V134L256 74Z" fill="#070707"/>
+<path d="M256 84L126 144V256C126 326 174 400 256 460C338 400 386 326 386 256V144L256 84Z" stroke="#FFCC00" stroke-width="4" stroke-linejoin="round"/>
+<path d="M 54 166 L 458 166 L 458 236 L 54 236 Z" fill="#0A1010"/>
+<text x="256" y="214" fill="white" font-family="sans-serif" font-weight="900" font-size="48" text-anchor="middle" style="text-transform:uppercase; letter-spacing: 0.1em;">FUTSAL HIVE</text>
+<g opacity="0.6">
+<path d="M256 400C283.614 400 306 377.614 306 350C306 322.386 283.614 300 256 300C228.386 300 206 322.386 206 350C206 377.614 228.386 400 256 400Z" stroke="white" stroke-width="2"/>
+<path d="M256 310C256 310 262 320 262 330M256 310C256 310 250 320 250 330M262 330L275 336M250 330L225 336M275 336L262 350M225 336L238 350M262 350H250M262 350L275 364M250 350L225 364M275 364L256 390M225 364L256 390" stroke="white" stroke-width="2"/>
+</g>
+<path d="M256 111C270 125 275 150 256 162C237 150 242 125 256 111Z" fill="#4CAF50"/>
+<path d="M220 111C190 111 170 150 256 162C342 150 322 111 292 111Z" fill="#2E7D32"/>
+</svg>

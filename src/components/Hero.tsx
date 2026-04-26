@@ -48,13 +48,13 @@ export default function Hero() {
               src={FUTSAL_HIVE_LOGO} 
               alt="Futsal Hive" 
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,204,0,0.5)]"
+              className="w-full h-full object-cover relative z-10 rounded-2xl drop-shadow-[0_0_15px_rgba(255,204,0,0.5)]"
             />
           </motion.div>
 
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-hive-yellow/10 border border-hive-yellow/20 text-hive-yellow text-xs font-bold uppercase tracking-widest mb-8">
             <Zap size={14} className="animate-pulse" />
-            Dhaka's Most Futuristic Arena 🚀
+            Dhaka's Most Futuristic Arena
           </span>
           
           <div className="h-32 md:h-48 flex items-center justify-center">
@@ -109,18 +109,24 @@ export default function Hero() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link 
-              to="/booking"
-              className="w-full sm:w-auto bg-hive-yellow text-hive-black px-10 py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 hover:scale-105 transition-all active:scale-95 shadow-xl shadow-hive-yellow/20 uppercase tracking-wider"
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              className="w-full sm:w-auto"
             >
-              Book Your Slot ⚡
-              <ArrowRight size={20} />
-            </Link>
+              <Link 
+                to="/booking"
+                className="w-full bg-hive-yellow text-hive-black px-10 py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 hover:scale-105 transition-all active:scale-95 shadow-xl shadow-hive-yellow/40 uppercase tracking-wider"
+              >
+                Book Your Slot
+                <ArrowRight size={20} />
+              </Link>
+            </motion.div>
             <Link 
               to="/gallery"
               className="w-full sm:w-auto bg-white/5 hover:bg-white/10 text-white px-10 py-4 rounded-xl font-bold text-lg border border-white/10 transition-all backdrop-blur-md uppercase tracking-wider"
             >
-              View Gallery 📸
+              View Gallery
             </Link>
           </div>
 

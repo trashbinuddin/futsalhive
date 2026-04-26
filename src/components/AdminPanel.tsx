@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking, Pricing } from '../context/BookingContext';
-import { Check, X, Clock, DollarSign, Calendar as CalendarIcon, Filter, Users, CreditCard, Edit2 } from 'lucide-react';
+import { useGallery } from '../context/GalleryContext';
+import { Check, X, Clock, DollarSign, Calendar as CalendarIcon, Filter, Users, CreditCard, Edit2, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '../lib/utils';
+import { cn, formatTime12h } from '../lib/utils';
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Navigate } from 'react-router-dom';
 
 export default function AdminPanel() {
   const { user: currentUser, role, superAdminEmail, updateSuperAdmin, loading: authLoading } = useAuth();
-  const { bookings, pricing, coupons, updateBookingStatus, loading: bookingsLoading } = useBooking();
-  const [activeTab, setActiveTab] = useState<'bookings' | 'pricing' | 'team' | 'coupons'>('bookings');
+  const { bookings, pricing, coupons, updateBookingStatus, deleteBooking, loading: bookingsLoading } = useBooking();
+  const { images, addImage, deleteImage, loading: galleryLoading } = useGallery();
+  const [activeTab, setActiveTab] = useState<'bookings' | 'pricing' | 'team' | 'coupons' | 'gallery'>('bookings');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -114,33 +116,39 @@ export default function AdminPanel() {
     <div className="max-w-7xl mx-auto px-4 py-24 pt-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <h2 className="text-4xl font-display font-black text-white tracking-tighter uppercase shrink-0">
-          ADMIN <span className="text-hive-yellow">HUB ⚡</span>
+          ADMIN <span className="text-hive-yellow">HUB</span>
         </h2>
         
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex bg-black/30 p-1 rounded-xl border border-white/10">
+        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+          <div className="flex max-w-[calc(100vw-2rem)] overflow-x-auto bg-black/30 p-1 rounded-xl border border-white/10 scrollbar-hide">
             <button 
               onClick={() => setActiveTab('bookings')}
-              className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'bookings' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
+              className={cn("whitespace-nowrap shrink-0 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'bookings' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
             >
               Bookings
             </button>
             <button 
               onClick={() => setActiveTab('pricing')}
-              className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'pricing' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
+              className={cn("whitespace-nowrap shrink-0 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'pricing' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
             >
               Pricing
             </button>
             <button 
               onClick={() => setActiveTab('coupons')}
-              className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'coupons' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
+              className={cn("whitespace-nowrap shrink-0 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'coupons' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
             >
               Coupons
+            </button>
+            <button 
+              onClick={() => setActiveTab('gallery')}
+              className={cn("whitespace-nowrap shrink-0 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'gallery' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
+            >
+              Gallery
             </button>
             {role === 'admin' && (
               <button 
                 onClick={() => setActiveTab('team')}
-                className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'team' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
+                className={cn("whitespace-nowrap shrink-0 px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", activeTab === 'team' ? "bg-hive-yellow text-hive-black" : "text-gray-400 hover:text-white")}
               >
                 Team
               </button>
@@ -154,10 +162,10 @@ export default function AdminPanel() {
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest focus:outline-none focus:border-hive-yellow"
             >
               <option value="all">All Real-time</option>
-              <option value="pending">Pending ⏳</option>
-              <option value="confirmed">Confirmed ✅</option>
-              <option value="paid">Paid 💎</option>
-              <option value="cancelled">Cancelled ❌</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="paid">Paid</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           )}
         </div>
@@ -167,7 +175,7 @@ export default function AdminPanel() {
         <div className="grid gap-6">
           {filteredBookings.length === 0 ? (
             <div className="glass-card p-12 text-center text-white/40 uppercase font-black tracking-widest text-sm">
-              No bookings found in this category 🔍
+              No bookings found in this category
             </div>
           ) : (
             filteredBookings.map((booking) => (
@@ -209,7 +217,7 @@ export default function AdminPanel() {
                         <Clock size={16} className="text-hive-yellow" />
                         <div>
                           <p className="text-[10px] text-white/30 uppercase font-black">Time Slot</p>
-                          <p className="text-white font-bold">{booking.startTime} - {booking.endTime}</p>
+                          <p className="text-white font-bold">{formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)}</p>
                         </div>
                       </div>
                     </div>
@@ -232,14 +240,19 @@ export default function AdminPanel() {
                           <p className="text-red-400 font-black">৳{booking.price - (booking.advanceAmount || 0)}</p>
                         </div>
                       </div>
+                      {booking.confirmedBy && (
+                        <div className="mt-2 text-[9px] text-white/40 uppercase font-black tracking-widest border-t border-white/5 pt-2">
+                          Last Updated By: <span className="text-white/80">{booking.confirmedBy}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions Column */}
-                  <div className="lg:w-48 flex flex-row lg:flex-col gap-2">
+                  <div className="lg:w-48 flex flex-wrap lg:flex-col gap-2">
                     {booking.status !== 'confirmed' && booking.status !== 'paid' && booking.status !== 'cancelled' && (
                       <button 
-                        onClick={() => updateBookingStatus(booking.id, 'confirmed')}
+                        onClick={() => updateBookingStatus(booking.id, 'confirmed', currentUser?.email || 'Admin')}
                         className="flex-1 bg-green-500 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-green-600 transition-all flex items-center justify-center gap-2"
                       >
                         <Check size={14} /> Confirm
@@ -247,7 +260,7 @@ export default function AdminPanel() {
                     )}
                     {booking.status !== 'paid' && booking.status !== 'cancelled' && (
                       <button 
-                        onClick={() => updateBookingStatus(booking.id, 'paid')}
+                        onClick={() => updateBookingStatus(booking.id, 'paid', currentUser?.email || 'Admin')}
                         className="flex-1 bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
                       >
                         <DollarSign size={14} /> Mark Paid
@@ -255,7 +268,7 @@ export default function AdminPanel() {
                     )}
                     {booking.status !== 'cancelled' && (
                       <button 
-                        onClick={() => updateBookingStatus(booking.id, 'cancelled')}
+                        onClick={() => updateBookingStatus(booking.id, 'cancelled', currentUser?.email || 'Admin')}
                         className="flex-1 bg-white/5 border border-red-500/20 text-red-500 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
                       >
                         <X size={14} /> Cancel
@@ -264,11 +277,21 @@ export default function AdminPanel() {
                     {booking.status === 'cancelled' && (
                       <button 
                         onClick={() => updateBookingStatus(booking.id, 'pending')}
-                        className="flex-1 bg-white/5 border border-white/10 text-white/40 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:text-white hover:border-white/20 transition-all"
+                        className="flex-1 bg-white/5 border border-white/10 text-white/40 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
                       >
                         Restore
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        if(window.confirm('Are you sure you want to permanently delete this booking?')) {
+                          deleteBooking(booking.id);
+                        }
+                      }}
+                      className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -279,11 +302,13 @@ export default function AdminPanel() {
         <PricingManager pricing={pricing} />
       ) : activeTab === 'coupons' ? (
         <CouponManager coupons={coupons || []} />
+      ) : activeTab === 'gallery' ? (
+        <GalleryManager images={images} addImage={addImage} deleteImage={deleteImage} loading={galleryLoading} />
       ) : (
         <div className="grid gap-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div>
-              <h3 className="text-xl font-display font-black text-white uppercase tracking-tighter">OFFICIAL HIVE TEAM 🎖️</h3>
+              <h3 className="text-xl font-display font-black text-white uppercase tracking-tighter">OFFICIAL HIVE TEAM</h3>
               <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Showing only authorized team members chosen by admins</p>
             </div>
             
@@ -372,7 +397,7 @@ export default function AdminPanel() {
           {currentUser?.email === superAdminEmail && (
             <div className="mt-12 pt-12 border-t border-white/10">
               <div className="glass-card p-8 border-hive-yellow/20">
-                <h3 className="text-lg font-display font-black text-hive-yellow uppercase tracking-tight mb-2">SUPER ADMIN TRANSFER 🛡️</h3>
+                <h3 className="text-lg font-display font-black text-hive-yellow uppercase tracking-tight mb-2">SUPER ADMIN TRANSFER</h3>
                 <p className="text-white/40 text-xs uppercase tracking-widest mb-6">Permanently transfer full system ownership to another email address</p>
                 
                 <div className="flex flex-col md:flex-row gap-4">
@@ -465,7 +490,7 @@ function CouponManager({ coupons }: { coupons: any[] }) {
       </div>
 
       <div className="glass-card p-8 h-fit sticky top-32">
-        <div className="card-title-hive text-white uppercase tracking-wider">Create Coupon 🎫</div>
+        <div className="card-title-hive text-white uppercase tracking-wider">Create Coupon</div>
         <div className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Coupon Code</label>
@@ -492,7 +517,7 @@ function CouponManager({ coupons }: { coupons: any[] }) {
             </select>
           </div>
           <button onClick={handleAddCoupon} className="w-full bg-hive-yellow text-hive-black py-4 rounded-xl font-black text-sm uppercase tracking-wider mt-4 transition-transform active:scale-95">
-            Launch Coupon 🚀
+            Launch Coupon
           </button>
         </div>
       </div>
@@ -534,7 +559,12 @@ function PricingManager({ pricing }: { pricing: Pricing[] }) {
                 <Clock size={20} />
               </div>
               <div>
-                <div className="text-white font-bold capitalize">{p.dayType}</div>
+                <div className="text-white font-bold capitalize">
+                  {p.dayType === 'everyday' ? 'Everyday' 
+                    : p.dayType === 'weekday' ? 'Weekday (Sun-Thu)' 
+                    : p.dayType === 'weekend' ? 'Weekend (Fri-Sat)' 
+                    : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseInt(p.dayType)] || p.dayType}
+                </div>
                 <div className="text-sm text-gray-500">{p.startTime} - {p.endTime}</div>
               </div>
               <div className="text-2xl font-display font-black text-hive-yellow">৳{p.price}</div>
@@ -568,8 +598,16 @@ function PricingManager({ pricing }: { pricing: Pricing[] }) {
               onChange={(e) => setNewPrice({...newPrice, dayType: e.target.value})}
               className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow"
             >
-              <option value="weekday">Weekday</option>
-              <option value="weekend">Weekend</option>
+              <option value="everyday">Everyday</option>
+              <option value="weekday">Weekday (Sun-Thu)</option>
+              <option value="weekend">Weekend (Fri-Sat)</option>
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -614,7 +652,142 @@ function PricingManager({ pricing }: { pricing: Pricing[] }) {
               </button>
             )}
             <button onClick={handleAddPricing} className="flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black text-sm uppercase tracking-wider mt-4 transition-transform active:scale-95">
-              {editingId ? 'Save Update 💾' : 'Add Pricing Rule 🚀'}
+              {editingId ? 'Save Update' : 'Add Pricing Rule'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GalleryManager({ images, addImage, deleteImage, loading }: any) {
+  const [newImage, setNewImage] = useState({ title: '', category: '' });
+  const [base64File, setBase64File] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Quick validation 
+    if (file.size > 1024 * 1024) {
+      alert("Please choose an image smaller than 1MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBase64File(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreate = async () => {
+    if (!base64File || !newImage.title || !newImage.category) return;
+    setIsUploading(true);
+    try {
+      await addImage(base64File, newImage.title.trim(), newImage.category.trim());
+      setNewImage({ title: '', category: '' });
+      setBase64File('');
+    } catch (e) {
+      console.error(e);
+      alert("Failed to upload. Try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-8">
+      {/* List */}
+      <div className="lg:col-span-2 space-y-4">
+        {loading ? (
+           <p className="text-white/40 text-[10px] font-black uppercase tracking-widest text-center mt-12">Loading Gallery Data...</p>
+        ) : images.length === 0 ? (
+           <div className="glass-card p-12 text-center text-white/40 uppercase font-black tracking-widest break-words border-dashed border-white/20">
+             No images uploaded. Add some to the right to feature them on the main page.
+           </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {images.map((img: any) => (
+               <div key={img.id} className="glass-card border-white/5 overflow-hidden group">
+                 <div className="aspect-[4/3] bg-black relative">
+                   <img src={img.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={img.title} />
+                   <button 
+                     onClick={() => deleteImage(img.id)}
+                     className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
+                     title="Delete Image"
+                   >
+                     <Trash2 size={14} />
+                   </button>
+                 </div>
+                 <div className="p-3 bg-white/5">
+                   <p className="text-[10px] font-black text-hive-yellow uppercase tracking-widest truncate">{img.category}</p>
+                   <p className="text-sm font-bold text-white truncate">{img.title}</p>
+                 </div>
+               </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Form */}
+      <div className="lg:col-span-1">
+        <div className="glass-card p-6 md:p-8 space-y-6 sticky top-24 border-hive-yellow/10">
+          <div>
+            <h3 className="text-xl font-display font-black text-hive-yellow uppercase tracking-tighter flex items-center gap-2">
+              <Upload size={20} /> Add Image
+            </h3>
+            <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Max limit 1MB per image</p>
+          </div>
+
+          <div className="space-y-4">
+            {base64File ? (
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
+                <img src={base64File} className="w-full h-full object-cover opacity-80" />
+                <button 
+                  onClick={() => setBase64File('')}
+                  className="absolute top-2 right-2 w-8 h-8 bg-black/80 hover:bg-red-500 rounded-lg text-white flex items-center justify-center transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label className="w-full aspect-video border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-hive-yellow/50 hover:bg-hive-yellow/5 transition-all text-white/40 hover:text-hive-yellow">
+                <ImageIcon size={24} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Select Image</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              </label>
+            )}
+
+            <div>
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Title</label>
+              <input 
+                type="text"
+                placeholder="e.g. Night Match"
+                value={newImage.title}
+                onChange={(e) => setNewImage({...newImage, title: e.target.value})}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Category</label>
+              <input 
+                type="text"
+                placeholder="e.g. Action, Facilities"
+                value={newImage.category}
+                onChange={(e) => setNewImage({...newImage, category: e.target.value})}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow text-sm"
+              />
+            </div>
+            
+            <button 
+              disabled={isUploading || !base64File || !newImage.title || !newImage.category}
+              onClick={handleCreate} 
+              className="w-full bg-hive-yellow text-hive-black py-4 rounded-xl font-black text-sm uppercase tracking-wider mt-4 transition-transform active:scale-95 disabled:opacity-50"
+            >
+              {isUploading ? 'Uploading...' : 'Upload Image'}
             </button>
           </div>
         </div>

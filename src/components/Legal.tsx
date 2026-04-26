@@ -1,10 +1,65 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ShieldCheck, Info, RotateCcw } from 'lucide-react';
+import { ShieldCheck, RotateCcw, Lock } from 'lucide-react';
 
 export default function Legal() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      setTimeout(() => {
+        const id = location.hash.replace('#', '');
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [location]);
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-32 space-y-24">
+      {/* Privacy Policy */}
+      <section id="privacy" className="space-y-8">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow">
+            <Lock size={24} />
+          </div>
+          <h2 className="text-4xl font-display font-black text-white tracking-tighter uppercase">Privacy Policy</h2>
+        </div>
+        
+        <div className="glass-card p-8 md:p-12 space-y-6 text-white/70 leading-relaxed">
+          <p className="text-sm">Effective Date: April 2026</p>
+          <div className="space-y-4">
+            <h3 className="text-white font-black uppercase tracking-widest text-sm">1. INFORMATION WE COLLECT</h3>
+            <p>We collect information you directly provide when using our services, including: name, phone number, email address (if using Google Login), and payment transaction details. We also collect basic interaction data automatically via cookies and similar technologies.</p>
+          </div>
+          
+          <div className="space-y-4">
+            <h3 className="text-white font-black uppercase tracking-widest text-sm">2. HOW WE USE YOUR DATA</h3>
+            <p>Your data is strictly used to manage your futsal bookings, send booking confirmations, respond to customer service requests, and occasionally send promotional offers related directly to Futsal Hive. We do not sell your data to third parties.</p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-white font-black uppercase tracking-widest text-sm">3. COOKIE POLICY</h3>
+            <p>We use minimal cookies to keep you logged in to your account, preserve your booking preferences, and analyze basic site traffic. You can choose to disable cookies through your browser settings, though this may impact core site functionality.</p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-white font-black uppercase tracking-widest text-sm">4. THIRD-PARTY SERVICES</h3>
+            <p>We utilize trusted third-party services like Google Authentication for seamless logins and Google Apps Script for automated sheets integration. These services process your data securely according to their respective privacy agreements.</p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-white font-black uppercase tracking-widest text-sm">5. DATA SECURITY</h3>
+            <p>Futsal Hive implements robust security measures to protect your personal information against unauthorized access, alteration, or disclosure. However, no internet transmission is 100% secure, and we cannot guarantee absolute security.</p>
+          </div>
+        </div>
+      </section>
+
       {/* Terms & Conditions */}
       <section id="terms" className="space-y-8">
         <div className="flex items-center gap-4 mb-4">

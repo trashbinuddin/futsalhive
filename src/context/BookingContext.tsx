@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../lib/error-handler';
 
 export interface Pricing {
   id: string;
-  dayType: 'weekday' | 'weekend';
+  dayType: string;
   startTime: string;
   endTime: string;
   price: number;
@@ -23,6 +23,7 @@ export interface Booking {
   userId: string;
   userName: string;
   userPhone: string;
+  userEmail?: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -33,6 +34,8 @@ export interface Booking {
   discountAmount?: number;
   paymentMethod?: string;
   transactionId?: string;
+  paymentPhoneLast4?: string;
+  confirmedBy?: string;
   createdAt: any;
 }
 
@@ -41,8 +44,9 @@ interface BookingContextType {
   bookings: Booking[];
   coupons: Coupon[];
   loading: boolean;
-  createBooking: (booking: Omit<Booking, 'id' | 'createdAt'>) => Promise<void>;
-  updateBookingStatus: (id: string, status: Booking['status']) => Promise<void>;
+  createBooking: (booking: Omit<Booking, 'id' | 'createdAt'>) => Promise<string>;
+  updateBookingStatus: (id: string, status: Booking['status'], confirmedBy?: string) => Promise<void>;
+  deleteBooking: (id: string) => Promise<void>;
   validateCoupon: (code: string) => Promise<Coupon | null>;
 }
 
@@ -104,29 +108,49 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         createdAt: serverTimestamp(),
       });
       
-      // Notify via Telegram
-      const newMessage = formatBookingMessage({ ...booking, id: docRef.id }, 'new');
-      await sendTelegramNotification(newMessage);
+      // Notify via Telegram (Isolated so it doesn't break other features if blocked)
+      try {
+        const newMessage = formatBookingMessage({ ...booking, id: docRef.id }, 'new');
+        await sendTelegramNotification(newMessage);
+      } catch (err) {
+        console.error("Telegram ping bypassed");
+      }
 
-      // Sync to Google Sheets
-      await sendToGoogleSheets({ ...booking, id: docRef.id });
+      // Sync to Google Sheets (Isolated)
+      try {
+        await sendToGoogleSheets({ ...booking, id: docRef.id });
+      } catch (err) {
+        console.error("Google sheets ping bypassed");
+      }
+      return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'bookings');
+      throw error;
     }
   };
 
-  const updateBookingStatus = async (id: string, status: Booking['status']) => {
+  const updateBookingStatus = async (id: string, status: Booking['status'], confirmedBy?: string) => {
     try {
-      await updateDoc(doc(db, 'bookings', id), { status });
+      const updateData: any = { status };
+      if (confirmedBy) {
+        updateData.confirmedBy = confirmedBy;
+      }
+      
+      await updateDoc(doc(db, 'bookings', id), updateData);
       
       // Find the booking to send accurate notification
       const booking = bookings.find(b => b.id === id);
       if (booking) {
-        const updateMessage = formatBookingMessage({ ...booking, status }, 'update');
-        await sendTelegramNotification(updateMessage);
+        const fullBookingData = { ...booking, status, ...(confirmedBy && { confirmedBy }) };
+        try {
+          const updateMessage = formatBookingMessage(fullBookingData, 'update');
+          await sendTelegramNotification(updateMessage);
+        } catch (err) { }
         
-        // Sync to Google Sheets with new status
-        await sendToGoogleSheets({ ...booking, status });
+        try {
+          // Sync to Google Sheets with new status
+          await sendToGoogleSheets(fullBookingData);
+        } catch (err) {}
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `bookings/${id}`);
@@ -153,8 +177,16 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
+  const deleteBooking = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'bookings', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `bookings/${id}`);
+    }
+  };
+
   return (
-    <BookingContext.Provider value={{ pricing, bookings, coupons, loading, createBooking, updateBookingStatus, validateCoupon }}>
+    <BookingContext.Provider value={{ pricing, bookings, coupons, loading, createBooking, updateBookingStatus, deleteBooking, validateCoupon }}>
       {children}
     </BookingContext.Provider>
   );

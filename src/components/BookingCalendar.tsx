@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking } from '../context/BookingContext';
 import { Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, formatTime12h } from '../lib/utils';
 import { FUTSAL_HIVE_LOGO } from '../lib/constants';
 
 const TIME_SLOTS = [
@@ -21,16 +21,20 @@ export default function BookingCalendar() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [step, setStep] = useState<'select' | 'confirm' | 'otp' | 'payment' | 'success'>('select');
   const [phone, setPhone] = useState('');
+  const [playerName, setPlayerName] = useState('');
   const [otp, setOtp] = useState('');
   const [advanceAmount, setAdvanceAmount] = useState<number>(500);
   const [paymentMethod, setPaymentMethod] = useState<'bkash' | 'nagad' | 'rocket'>('bkash');
   const [transactionId, setTransactionId] = useState('');
+  const [paymentPhoneLast4, setPaymentPhoneLast4] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [couponError, setCouponError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [bookedId, setBookedId] = useState<string | null>(null);
+
 
   const next7Days = useMemo(() => {
     return Array.from({ length: 14 }).map((_, i) => addDays(startOfDay(new Date()), i));
@@ -50,6 +54,43 @@ export default function BookingCalendar() {
     const [hours, minutes] = slot.split(':').map(Number);
     const timeValue = hours + minutes / 60;
 
+    // 1. Check dynamic pricing rules first
+    if (pricing && pricing.length > 0) {
+      // Find matching rule. We prioritize exact day over weekend/weekday, over everyday
+      let matchedRule = null;
+      let matchedPriority = -1; // Higher is better
+
+      for (const rule of pricing) {
+        // Parse rule times
+        const [startH, startM] = rule.startTime.split(':').map(Number);
+        const [endH, endM] = rule.endTime.split(':').map(Number);
+        let ruleStart = startH + startM / 60;
+        let ruleEnd = endH + endM / 60;
+        if (ruleEnd < ruleStart) ruleEnd += 24; // Handle overnight rules, e.g. 23:00 to 02:00
+
+        let adjustedSlotTime = timeValue;
+        if (timeValue < 6 && ruleEnd > 24) adjustedSlotTime += 24; // If the slot is 00:00 - 05:00, map to 24:00+ for comparison
+
+        const inTimeRange = adjustedSlotTime >= ruleStart && adjustedSlotTime < ruleEnd;
+
+        if (inTimeRange) {
+          if (rule.dayType === dayOfWeek.toString()) {
+            if (matchedPriority < 3) { matchedRule = rule; matchedPriority = 3; }
+          } else if (isWeekend && rule.dayType === 'weekend') {
+            if (matchedPriority < 2) { matchedRule = rule; matchedPriority = 2; }
+          } else if (!isWeekend && rule.dayType === 'weekday') {
+            if (matchedPriority < 2) { matchedRule = rule; matchedPriority = 2; }
+          } else if (rule.dayType === 'everyday') {
+            if (matchedPriority < 1) { matchedRule = rule; matchedPriority = 1; }
+          }
+        }
+      }
+      if (matchedRule) {
+        return matchedRule.price;
+      }
+    }
+
+    // 2. Fallback to hardcoded values
     // Student Special (Sun-Thu, 06:00 - 16:30)
     const isStudentDay = dayOfWeek >= 0 && dayOfWeek <= 4; // Sun-Thu
     
@@ -94,9 +135,10 @@ export default function BookingCalendar() {
       
       const endTimeSlot = TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot) + 1] || '01:30';
       
-      await createBooking({
+      const newId = await createBooking({
         userId: user.uid,
-        userName: user.displayName || 'Guest',
+        userName: playerName || user.displayName || 'Guest',
+        userEmail: user.email || '',
         userPhone: phone,
         date: format(selectedDate, 'yyyy-MM-dd'),
         startTime: selectedSlot,
@@ -107,8 +149,10 @@ export default function BookingCalendar() {
         couponCode: appliedCoupon?.code,
         discountAmount: appliedCoupon?.discount,
         paymentMethod,
-        transactionId
+        transactionId,
+        paymentPhoneLast4
       });
+      setBookedId(newId);
       setStep('success');
     } catch (error: any) {
       console.error('Booking failed:', error);
@@ -125,7 +169,7 @@ export default function BookingCalendar() {
   const PAYMENT_LOGOS = {
     bkash: 'https://logos-download.com/wp-content/uploads/2022/01/BKash_Logo.png',
     nagad: 'https://logos-download.com/wp-content/uploads/2022/01/Nagad_Logo.png',
-    rocket: 'https://raw.githubusercontent.com/tushar-halder/bd-payment-gateways/master/logos/rocket.png'
+    rocket: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMDAgMTAwIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzhDMTU5NSIgcng9IjIwIi8+PHRleHQgeD0iMTUwIiB5PSI0NSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyOCIgZm9udC1zdHlsZT0iaXRhbGljIiBmb250LXdlaWdodD0iOTAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Sb2NrZXQ8L3RleHQ+PHRleHQgeD0iMTUwIiB5PSI3NSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkR1dGNoLUJhbmdsYSBCYW5rPC90ZXh0Pjwvc3ZnPg=='
   };
 
   return (
@@ -141,10 +185,10 @@ export default function BookingCalendar() {
             src={FUTSAL_HIVE_LOGO} 
             alt="Futsal Hive" 
             referrerPolicy="no-referrer"
-            className="w-full h-full object-contain relative z-10"
+            className="w-full h-full object-cover relative z-10 rounded-2xl"
           />
         </motion.div>
-        <h2 className="text-4xl font-display font-black text-white mb-4 tracking-tighter">RESERVE YOUR ARENA 🏟️</h2>
+        <h2 className="text-4xl font-display font-black text-white mb-4 tracking-tighter">RESERVE YOUR ARENA</h2>
         <p className="text-white/60">Select your preferred date and time to start the game.</p>
       </div>
 
@@ -196,9 +240,9 @@ export default function BookingCalendar() {
                           : "bg-black/30 border-white/10 text-gray-300 hover:border-hive-yellow/50"
                     )}
                   >
-                    <div className="text-base font-display font-bold">{slot}</div>
-                    <div className={cn("text-[9px] uppercase tracking-wider", selected ? "text-hive-black/80 font-bold" : "text-white/40")}>
-                      - {TIME_SLOTS[TIME_SLOTS.indexOf(slot) + 1] || '01:30'}
+                    <div className="text-base font-display font-bold">{formatTime12h(slot)}</div>
+                    <div className={cn("text-[8px] uppercase tracking-wider", selected ? "text-hive-black/80 font-bold" : "text-white/40")}>
+                      - {formatTime12h(TIME_SLOTS[TIME_SLOTS.indexOf(slot) + 1] || '01:30')}
                     </div>
                     <div className={cn("text-[9px] uppercase tracking-wider mt-1", selected ? "text-hive-black/70" : "text-gray-500")}>
                       {booked ? 'Booked' : `৳${price}`}
@@ -220,7 +264,7 @@ export default function BookingCalendar() {
                 }}
                 className="w-full bg-hive-yellow text-hive-black py-4 rounded-xl font-black text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed transition-transform active:scale-95 flex items-center justify-center gap-2"
               >
-                {user ? 'Confirm Slot 🚀' : 'Login to Book 🔑'}
+                {user ? 'Confirm Slot' : 'Login to Book'}
               </button>
             </div>
           </motion.div>
@@ -231,44 +275,31 @@ export default function BookingCalendar() {
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="bg-black/30 p-4 rounded-xl border border-white/10">
-                  <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Selected Slot 📅</span>
+                  <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Selected Slot</span>
                   <div className="text-xl font-display font-bold text-white mt-1">
-                    {format(selectedDate, 'MMMM dd, yyyy')} | {selectedSlot} - {TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot!) + 1] || '01:30'}
+                    {format(selectedDate, 'MMMM dd, yyyy')} | {formatTime12h(selectedSlot!)} - {formatTime12h(TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot!) + 1] || '01:30')}
                   </div>
                 </div>
                 <div className="bg-black/30 p-4 rounded-xl border border-white/10">
-                  <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Total Price 💰</span>
+                  <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Total Price</span>
                   <div className="text-3xl font-display font-black text-hive-yellow mt-1">
                     ৳{calculateFinalPrice()}
                     {appliedCoupon && <span className="text-xs text-white/40 line-through ml-2">৳{selectedSlot ? getPriceForSlot(selectedSlot) : 0}</span>}
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">Have a Coupon? 🏷️</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder="ENTER CODE"
-                      className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors uppercase font-black tracking-widest text-xs"
-                    />
-                    <button 
-                      onClick={handleApplyCoupon}
-                      className="bg-white/10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 transition-all border border-white/5"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  {couponError && <p className="text-[10px] text-red-500 font-bold uppercase">{couponError}</p>}
-                  {appliedCoupon && <p className="text-[10px] text-green-500 font-bold uppercase">🎉 Applied: ৳{appliedCoupon.discount} OFF</p>}
-                </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Phone Number 📱</label>
+                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Player Name</label>
+                  <input 
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors mb-4"
+                  />
+                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Phone Number</label>
                   <input 
                     type="tel"
                     value={phone}
@@ -280,11 +311,11 @@ export default function BookingCalendar() {
                 <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4">
                   <button onClick={() => setStep('select')} className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none">Back</button>
                   <button 
-                    disabled={!phone || phone.length < 11}
+                    disabled={!phone || phone.length < 11 || !playerName.trim()}
                     onClick={() => setStep('otp')} 
                     className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
                   >
-                    Verify Phone 🔐
+                    Verify Details
                   </button>
                 </div>
               </div>
@@ -297,7 +328,7 @@ export default function BookingCalendar() {
             <div className="w-16 h-16 bg-hive-yellow/10 text-hive-yellow rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock size={32} />
             </div>
-            <h3 className="text-2xl font-display font-bold text-white">Verification Code 🔢</h3>
+            <h3 className="text-2xl font-display font-bold text-white">Verification Code</h3>
             <p className="text-white/60 text-sm">We've sent a 6-digit code to {phone}. <br/> (Simulated: Enter 123456)</p>
             
             <input 
@@ -316,7 +347,7 @@ export default function BookingCalendar() {
                 onClick={() => setStep('payment')} 
                 className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
               >
-                Verify & Pay 💳
+                Verify & Pay
               </button>
             </div>
           </motion.div>
@@ -330,11 +361,44 @@ export default function BookingCalendar() {
                 {bookingError}
               </div>
             )}
+
+            <div className="bg-black/30 p-6 rounded-2xl border border-white/10 mb-8">
+              <div className="flex justify-between items-end mb-6">
+                <div>
+                  <span className="text-[10px] text-white/50 uppercase font-bold tracking-wider">Total Amount</span>
+                  <div className="text-3xl font-display font-black text-hive-yellow mt-1">
+                    ৳{calculateFinalPrice()}
+                    {appliedCoupon && <span className="text-xs text-white/40 line-through ml-2">৳{selectedSlot ? getPriceForSlot(selectedSlot) : 0}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider">Have a Coupon?</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    placeholder="ENTER CODE"
+                    className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors uppercase font-black tracking-widest text-xs"
+                  />
+                  <button 
+                    onClick={handleApplyCoupon}
+                    className="bg-white/10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-white/20 transition-all border border-white/5"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {couponError && <p className="text-[10px] text-red-500 font-bold uppercase">{couponError}</p>}
+                {appliedCoupon && <p className="text-[10px] text-green-500 font-bold uppercase">Applied: ৳{appliedCoupon.discount} OFF</p>}
+              </div>
+            </div>
             
             <div className="bg-hive-yellow/10 border border-hive-yellow/20 p-6 rounded-2xl mb-8">
               <div className="flex items-center gap-3 mb-4">
                 <CreditCard className="text-hive-yellow" />
-                <h3 className="text-lg font-bold text-white">Advance Payment 💸</h3>
+                <h3 className="text-lg font-bold text-white">Advance Payment</h3>
               </div>
               <p className="text-sm text-hive-yellow leading-relaxed mb-6">
                 Minimum advance: <strong>৳500</strong>. You can pay up to the full amount.
@@ -392,15 +456,28 @@ export default function BookingCalendar() {
                 </a>
               </p>
               
-              <div>
-                <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Transaction ID 🧾</label>
-                <input 
-                  type="text"
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  placeholder="Enter Transaction ID"
-                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Sender's Last 4 Digits</label>
+                  <input 
+                    type="text"
+                    maxLength={4}
+                    value={paymentPhoneLast4}
+                    onChange={(e) => setPaymentPhoneLast4(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 9876"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-white/50 uppercase tracking-wider mb-2">Transaction ID</label>
+                  <input 
+                    type="text"
+                    value={transactionId}
+                    onChange={(e) => setTransactionId(e.target.value)}
+                    placeholder="Enter TrxID"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hive-yellow transition-colors"
+                  />
+                </div>
               </div>
             </div>
 
@@ -413,7 +490,7 @@ export default function BookingCalendar() {
                 Back
               </button>
               <button 
-                disabled={!transactionId || isSubmitting}
+                disabled={!transactionId || paymentPhoneLast4.length !== 4 || isSubmitting}
                 onClick={handleBooking} 
                 className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95 flex items-center justify-center gap-2"
               >
@@ -424,7 +501,7 @@ export default function BookingCalendar() {
                   </>
                 ) : (
                   <>
-                    Complete Booking ✅
+                    Complete Booking
                   </>
                 )}
               </button>
@@ -438,15 +515,28 @@ export default function BookingCalendar() {
               <CheckCircle2 size={48} />
             </div>
             <h3 className="text-3xl font-display font-black text-white mb-2">BOOKING REQUEST SENT!</h3>
+            
+            <div className="bg-black/30 border border-white/10 rounded-xl p-6 max-w-sm mx-auto mb-8 space-y-3">
+              <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider">Player Name</span>
+                <span className="text-sm font-bold text-white">{playerName || 'Guest'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider">Booking ID</span>
+                <span className="text-xs font-mono font-bold text-hive-yellow">{bookedId ? bookedId.slice(0, 8).toUpperCase() : 'PENDING'}</span>
+              </div>
+            </div>
+
             <p className="text-gray-400 mb-8">We've received your booking request. Our team will verify the payment and confirm your slot shortly.</p>
             <button 
               onClick={() => {
                 setStep('select');
                 setSelectedSlot(null);
+                setBookedId(null);
               }}
-              className="hive-gradient text-hive-black px-8 py-3 rounded-full font-black"
+              className="hive-gradient text-hive-black px-8 py-3 rounded-full font-black uppercase tracking-wider"
             >
-              BOOK ANOTHER SLOT
+              Book Another Slot
             </button>
           </motion.div>
         )}

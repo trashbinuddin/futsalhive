@@ -27,7 +27,7 @@ export default function Reviews() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-24">
       <div className="text-center mb-16">
-        <h2 className="text-4xl font-display font-black text-white mb-4 tracking-tighter">WHAT THE PLAYERS SAY 🗣️</h2>
+        <h2 className="text-4xl font-display font-black text-white mb-4 tracking-tighter">WHAT THE PLAYERS SAY</h2>
         <p className="text-white/60">Real feedback from our regular hive members.</p>
       </div>
 

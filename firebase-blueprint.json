@@ -34,6 +34,7 @@
         "discountAmount": { "type": "number" },
         "paymentMethod": { "type": "string", "enum": ["bkash", "nagad", "rocket"] },
         "transactionId": { "type": "string" },
+        "paymentPhoneLast4": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "date", "startTime", "endTime", "status", "price"]

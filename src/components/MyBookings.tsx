@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking } from '../context/BookingContext';
 import { Calendar as CalendarIcon, Clock, CreditCard, ChevronRight, X, AlertCircle, CheckCircle2, History } from 'lucide-react';
 import { format, isBefore, isAfter, parseISO, startOfDay } from 'date-fns';
-import { cn } from '../lib/utils';
+import { cn, formatTime12h } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, Navigate } from 'react-router-dom';
 import { FUTSAL_HIVE_LOGO } from '../lib/constants';
@@ -62,12 +62,12 @@ export default function MyBookings() {
               src={FUTSAL_HIVE_LOGO} 
               alt="Logo" 
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain relative z-10"
+              className="w-full h-full object-cover relative z-10 rounded-2xl"
             />
           </div>
           <div>
             <h2 className="text-4xl md:text-5xl font-display font-black text-white tracking-tighter uppercase mb-2 md:mb-4">
-              MY <span className="text-hive-yellow">BATTLES ⚽</span>
+              MY <span className="text-hive-yellow">BATTLES</span>
             </h2>
             <p className="text-white/60 max-w-md uppercase text-[10px] font-bold tracking-[0.2em]">Track your bookings, history, and arena schedules in real-time.</p>
           </div>
@@ -154,7 +154,7 @@ export default function MyBookings() {
                       <div>
                         <p className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Time Slot</p>
                         <p className="text-white font-black uppercase tracking-tighter">
-                          {booking.startTime} - {booking.endTime}
+                          {formatTime12h(booking.startTime)} - {formatTime12h(booking.endTime)}
                         </p>
                       </div>
                     </div>
@@ -241,7 +241,7 @@ export default function MyBookings() {
                       </div>
                       <div>
                         <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Time Slot</p>
-                        <p className="text-white font-bold">{selectedBooking.startTime} - {selectedBooking.endTime}</p>
+                        <p className="text-white font-bold">{formatTime12h(selectedBooking.startTime)} - {formatTime12h(selectedBooking.endTime)}</p>
                       </div>
                     </div>
                   </div>

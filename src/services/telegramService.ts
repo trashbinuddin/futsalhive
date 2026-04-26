@@ -1,28 +1,15 @@
 /// <reference types="vite/client" />
 
-interface TelegramConfig {
-  botToken: string;
-  chatId: string;
-}
-
-const DEFAULT_CONFIG: TelegramConfig = {
-  botToken: import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8698956553:AAFlptYgft-7uwrjX3OG9t-Bta_eAwXFh_4',
-  chatId: import.meta.env.VITE_TELEGRAM_CHAT_ID || '5738602587'
-};
+import { formatTime12h } from '../lib/utils';
 
 export async function sendTelegramNotification(message: string) {
   try {
-    const url = `https://api.telegram.org/bot${DEFAULT_CONFIG.botToken}/sendMessage`;
-    const response = await fetch(url, {
+    const response = await fetch('/api/telegram', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        chat_id: DEFAULT_CONFIG.chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify({ message }),
     });
 
     if (!response.ok) {
@@ -35,24 +22,23 @@ export async function sendTelegramNotification(message: string) {
 }
 
 export function formatBookingMessage(booking: any, type: 'new' | 'update') {
-  const statusEmoji = {
-    pending: '⏳',
-    confirmed: '✅',
-    paid: '💎',
-    cancelled: '❌'
-  };
-
-  const title = type === 'new' ? '🆕 <b>NEW BOOKING!</b>' : '🔄 <b>BOOKING UPDATED!</b>';
+  const title = type === 'new' ? '<b>NEW BOOKING!</b>' : '<b>BOOKING UPDATED!</b>';
   
+  const updatedByLine = type === 'update' && booking.confirmedBy 
+    ? `\n<b>Updated By:</b> ${booking.confirmedBy}`
+    : '';
+
   return `${title}
 --------------------------
-👤 <b>Player:</b> ${booking.userName}
-📞 <b>Phone:</b> ${booking.userPhone}
-📅 <b>Date:</b> ${booking.date}
-⏰ <b>Time:</b> ${booking.startTime} - ${booking.endTime}
-💰 <b>Price:</b> ৳${booking.price}
-💳 <b>Advance:</b> ৳${booking.advanceAmount || 0}
-🏷️ <b>Status:</b> ${booking.status.toUpperCase()} ${statusEmoji[booking.status as keyof typeof statusEmoji] || ''}
+<b>Player:</b> ${booking.userName}
+<b>Phone:</b> ${booking.userPhone}
+<b>Date:</b> ${booking.date}
+<b>Time:</b> ${formatTime12h(booking.startTime)} - ${formatTime12h(booking.endTime)}
+<b>Price:</b> ৳${booking.price}
+<b>Advance:</b> ৳${booking.advanceAmount || 0}
+<b>Method:</b> ${booking.paymentMethod?.toUpperCase() || 'N/A'} (Last 4: ${booking.paymentPhoneLast4 || 'N/A'})
+<b>TrxID:</b> ${booking.transactionId || 'N/A'}
+<b>Status:</b> ${booking.status.toUpperCase()}${updatedByLine}
 --------------------------
-📍 <i>Futsal Hive Arena</i>`;
+<i>Futsal Hive Arena</i>`;
 }

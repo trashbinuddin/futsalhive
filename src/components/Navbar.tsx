@@ -12,14 +12,14 @@ export default function Navbar() {
   const location = useLocation();
 
   const navLinks = [
-    { name: 'Home 🏠', path: '/' },
-    { name: 'Booking ⚡', path: '/booking' },
-    { name: 'Gallery 📸', path: '/gallery' },
-    { name: 'Contact ✉️', path: '/contact' },
+    { name: 'Home', path: '/' },
+    { name: 'Booking', path: '/booking' },
+    { name: 'Gallery', path: '/gallery' },
+    { name: 'Contact', path: '/contact' },
   ];
 
   if (user) {
-    navLinks.splice(2, 0, { name: 'My Bookings 🛡️', path: '/my-bookings' });
+    navLinks.splice(2, 0, { name: 'My Bookings', path: '/my-bookings' });
   }
 
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -36,7 +36,7 @@ export default function Navbar() {
                   src={FUTSAL_HIVE_LOGO} 
                   alt="Futsal Hive" 
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain relative z-10"
+                  className="w-full h-full object-cover relative z-10 rounded-lg"
                 />
               </div>
               <span className="text-xl font-display font-black tracking-tighter text-hive-yellow uppercase">
@@ -155,7 +155,7 @@ export default function Navbar() {
                   src={FUTSAL_HIVE_LOGO} 
                   alt="Futsal Hive" 
                   referrerPolicy="no-referrer"
-                  className="w-8 h-8 object-contain"
+                  className="w-8 h-8 object-cover rounded-lg"
                 />
                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white">Futsal Hive Elite</p>
               </div>

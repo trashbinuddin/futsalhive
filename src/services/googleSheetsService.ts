@@ -1,28 +1,35 @@
-export const GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw4IPNWOvRW7W30U3Mo7O3qn7iRD10DaVU2x86VprDlXsF1o_iNVQgaJDpLZsqUSZ0D/exec';
+import { formatTime12h } from '../lib/utils';
 
 export async function sendToGoogleSheets(booking: any) {
   try {
     const payload = {
       userName: booking.userName || 'Unknown',
+      userEmail: booking.userEmail || '',
       userPhone: booking.userPhone || '',
       date: booking.date || '',
-      time: `${booking.startTime || ''} - ${booking.endTime || ''}`,
-      price: booking.price || 0,
-      status: booking.status || 'pending'
+      time: `${formatTime12h(booking.startTime || '')} - ${formatTime12h(booking.endTime || '')}`,
+      price: String(booking.price || 0),
+      advanceAmount: String(booking.advanceAmount || 0),
+      paymentMethod: booking.paymentMethod || '',
+      transactionId: booking.transactionId || '',
+      paymentPhoneLast4: booking.paymentPhoneLast4 || '',
+      status: String(booking.status || 'pending'),
+      confirmedBy: booking.confirmedBy || 'System/User'
     };
 
-    // We use mode: 'no-cors' because Google Apps Script typically blocks standard 
-    // cross-origin requests from the browser. This allows "fire and forget".
-    await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+    const response = await fetch('/api/sheets', {
       method: 'POST',
-      mode: 'no-cors',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload)
     });
     
-    console.log('Successfully pinged Google Sheets API');
+    if (response.ok) {
+      console.log('Successfully dispatched Google Sheets webhook');
+    } else {
+      console.error('Failed to send data to Google Sheets API route');
+    }
   } catch (error) {
     console.error('Failed to send data to Google Sheets:', error);
   }
