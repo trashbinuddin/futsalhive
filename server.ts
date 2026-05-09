@@ -3,30 +3,51 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
 
 // Essential Security Middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // Vite uses inline scripts in dev
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'", "https:", "wss:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      fontSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:", "wss:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false,
+  crossOriginEmbedderPolicy: false,
 }));
+
+// Add Permissions-Policy which helmet doesn't add by default yet in all versions
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 app.use(cors()); // Configure proper CORS
 app.use(express.json({ limit: '10kb' })); // Mitigate payload attacks
 app.use(express.urlencoded({ extended: true, limit: '10kb' })); // Mitigate payload attacks
 
+// Trust proxy is required for Cloud Run / Nginx
+app.set('trust proxy', 1);
+
 // Rate Limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  limit: 100, // limit each IP to 100 requests per windowMs
   message: { error: 'Too many requests, please try again later.' }
 });
 
 // App Config - read from secure environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8698956553:AAFlptYgft-7uwrjX3OG9t-Bta_eAwXFh_4';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '5738602587';
-const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || 'https://script.google.com/macros/s/AKfycbw4IPNWOvRW7W30U3Mo7O3qn7iRD10DaVU2x86VprDlXsF1o_iNVQgaJDpLZsqUSZ0D/exec';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '-5214911829';
+const GOOGLE_SHEETS_WEBHOOK_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL || 'https://script.google.com/macros/s/AKfycbwyIJA3vufAPuq-FT3LBVQOg8ka1rqoVDliLicWoBZZ6dE03mkwIILN-vzb9Zuzwzfs/exec';
 
 // Apply rate limiter to all API routes
 app.use('/api/', apiLimiter);
@@ -100,6 +121,7 @@ app.post('/api/sheets', async (req, res) => {
 
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

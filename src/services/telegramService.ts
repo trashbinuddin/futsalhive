@@ -24,9 +24,17 @@ export async function sendTelegramNotification(message: string) {
 export function formatBookingMessage(booking: any, type: 'new' | 'update') {
   const title = type === 'new' ? '<b>NEW BOOKING!</b>' : '<b>BOOKING UPDATED!</b>';
   
-  const updatedByLine = type === 'update' && booking.confirmedBy 
+  let updatedByLine = type === 'update' && booking.confirmedBy 
     ? `\n<b>Updated By:</b> ${booking.confirmedBy}`
     : '';
+
+  if (type === 'update' && booking.status === 'cancelled') {
+    if (booking.confirmedBy) {
+      updatedByLine = `\n<b>Cancelled By Admin:</b> ${booking.confirmedBy}`;
+    } else {
+      updatedByLine = `\n<b>Cancelled By:</b> The User Himself`;
+    }
+  }
 
   return `${title}
 --------------------------

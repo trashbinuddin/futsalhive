@@ -48,6 +48,7 @@ export default function Hero() {
               src={FUTSAL_HIVE_LOGO} 
               alt="Futsal Hive" 
               referrerPolicy="no-referrer"
+              fetchPriority="high"
               className="w-full h-full object-cover relative z-10 rounded-2xl drop-shadow-[0_0_15px_rgba(255,204,0,0.5)]"
             />
           </motion.div>

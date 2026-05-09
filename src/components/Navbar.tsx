@@ -67,7 +67,7 @@ export default function Navbar() {
               {user ? (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <img src={user.photoURL || ''} alt={user.displayName || ''} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-hive-yellow/50" />
+                    <img src={user.photoURL || ''} alt={user.displayName || ''} referrerPolicy="no-referrer" loading="lazy" className="w-8 h-8 rounded-full border border-hive-yellow/50" />
                     <button onClick={logout} className="text-sm font-medium text-gray-300 hover:text-hive-yellow transition-colors flex items-center gap-1">
                       <LogOut size={16} />
                       <span className="hidden sm:inline">Logout</span>
@@ -126,7 +126,7 @@ export default function Navbar() {
                 {user ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <img src={user.photoURL || ''} alt={user.displayName || ''} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full border border-hive-yellow/50" />
+                      <img src={user.photoURL || ''} alt={user.displayName || ''} referrerPolicy="no-referrer" loading="lazy" className="w-10 h-10 rounded-full border border-hive-yellow/50" />
                       <div>
                         <p className="text-white font-black uppercase text-xs tracking-tighter">{user.displayName}</p>
                         <p className="text-white/40 text-[10px]">{user.email}</p>
@@ -155,6 +155,7 @@ export default function Navbar() {
                   src={FUTSAL_HIVE_LOGO} 
                   alt="Futsal Hive" 
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                   className="w-8 h-8 object-cover rounded-lg"
                 />
                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white">Futsal Hive Elite</p>

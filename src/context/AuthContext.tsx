@@ -28,22 +28,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // Fetch/Init config
         const configRef = doc(db, 'config', 'main');
-        const configSnap = await getDoc(configRef);
+        const configSnap = await getDoc(configRef).catch(e => {
+          console.error("Failed to get config/main", e);
+          throw e;
+        });
         
-        let currentSuperAdmin = 'imtiajulrivu@gmail.com';
+        let currentSuperAdmin = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'futsalhivebd@gmail.com';
         if (configSnap.exists()) {
-          currentSuperAdmin = configSnap.data().superAdminEmail || 'imtiajulrivu@gmail.com';
-        } else if (currentUser?.email === 'imtiajulrivu@gmail.com') {
+          currentSuperAdmin = configSnap.data().superAdminEmail || import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'futsalhivebd@gmail.com';
+        } else if (currentUser?.email === (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'futsalhivebd@gmail.com')) {
           // Initialize if it's the first time
-          await setDoc(configRef, { superAdminEmail: currentSuperAdmin });
+          await setDoc(configRef, { superAdminEmail: currentSuperAdmin }).catch(e => {
+            console.error("Failed to write to config/main", e);
+            throw e;
+          });
         }
         setSuperAdminEmail(currentSuperAdmin);
 
         if (currentUser) {
           const userDocRef = doc(db, 'users', currentUser.uid);
-          const userSnap = await getDoc(userDocRef);
+          const userSnap = await getDoc(userDocRef).catch(e => {
+            console.error("Failed to read users/uid", e);
+            throw e;
+          });
           
-          const isSuperAdmin = currentUser.email === currentSuperAdmin || currentUser.email === 'imtiajulrivu@gmail.com';
+          const isSuperAdmin = currentUser.email === currentSuperAdmin || currentUser.email === (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'futsalhivebd@gmail.com');
           const teamWhitelist = configSnap.data()?.teamEmails || [];
           const isTeamMember = teamWhitelist.includes(currentUser.email?.toLowerCase());
           
@@ -69,6 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               photoURL: currentUser.photoURL,
               role: initialRole,
               createdAt: serverTimestamp(),
+            }).catch(e => {
+              console.error("Failed to write users/uid doc initially", e, "Role:", initialRole);
+              throw e;
             });
             setRole(initialRole);
           }
@@ -78,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Auth sync error:', error);
         // Fail-safe for super admin if Firestore is fully blocked
-        if (currentUser?.email === 'imtiajulrivu@gmail.com' || currentUser?.email === superAdminEmail) {
+        if (currentUser?.email === (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'futsalhivebd@gmail.com') || currentUser?.email === superAdminEmail) {
           setRole('admin');
         }
       }
@@ -89,9 +101,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const login = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      // Configure provider to always select an account to prevent auto-login issues on some devices
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        console.warn('Login popup closed by user or cancelled.');
+      } else {
+        console.error('Login error:', error);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const logout = async () => {

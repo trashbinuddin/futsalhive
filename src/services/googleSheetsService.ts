@@ -3,11 +3,14 @@ import { formatTime12h } from '../lib/utils';
 export async function sendToGoogleSheets(booking: any) {
   try {
     const payload = {
+      id: booking.id || '',
       userName: booking.userName || 'Unknown',
       userEmail: booking.userEmail || '',
+      email: booking.userEmail || '',
       userPhone: booking.userPhone || '',
       date: booking.date || '',
       time: `${formatTime12h(booking.startTime || '')} - ${formatTime12h(booking.endTime || '')}`,
+      startTime24: booking.startTime || '',
       price: String(booking.price || 0),
       advanceAmount: String(booking.advanceAmount || 0),
       paymentMethod: booking.paymentMethod || '',

@@ -16,7 +16,7 @@ interface Message {
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: 'Hi! I am the Futsal Hive AI assistant. How can I help you with your booking today?' }
+    { role: 'model', text: 'Hi! I am the Futsal Hive AI assistant. How can I help you with your booking today? Please note that you can book a maximum of 1 slot per 24 hours (1 booking per day).' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,10 +49,12 @@ export function AIAssistant() {
 
       const systemInstruction = `You are the official AI Assistant for Futsal Hive, an elite futsal arena located in China Project, Aftabnagar, Dhaka. 
 Your goal is to help users understand pricing, operating hours, and how to book a match. Keep answers concise, friendly, and highly professional.
+Proactively inform users about the booking limits (maximum 1 slot per 24 hours / 1 per day) when discussing booking procedures.
+If the user's question is critical, urgent, or involves any situation that requires immediate management attention (such as an emergency, severe complaint, or immediate on-site help), you must provide the manager's phone number exactly as 01894-433325.
 Do NOT hallucinate information not provided. 
 Current Pricing Information:
-${pricingContext || 'Please direct the user to check the Booking page for pricing.'}
-To book, users need to click "Book Now" and select an available time slot. They are required to pay a ৳500 advance via bKash, Nagad, or Rocket.`;
+\${pricingContext || 'Please direct the user to check the Booking page for pricing.'}
+To book, users need to click "Book Now" and select an available time slot. ONLY mention the required ৳500 advance payment via bKash/Nagad/Rocket if the user explicitly asks about the booking process or payments.`;
 
       // Build chat history for the API format
       const history = messages.map(m => ({
@@ -82,9 +84,27 @@ To book, users need to click "Book Now" and select an available time slot. They 
       if (response.text) {
         setMessages(prev => [...prev, { role: 'model', text: response.text }]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, { role: 'model', text: 'Sorry, I encountered an error connecting to my servers. Please try again later!' }]);
+      
+      let errorMessage = 'Sorry, I encountered an error connecting to my servers. Please try again later!';
+      
+      if (error?.message) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('api key')) {
+          errorMessage = 'The AI service is currently unavailable due to an API key configuration issue. Please contact the administrator.';
+        } else if (msg.includes('quota') || msg.includes('429')) {
+          errorMessage = 'The AI service has reached its request limit. Please try again later.';
+        } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) {
+          errorMessage = 'Please check your internet connection and try again.';
+        } else if (msg.includes('timeout')) {
+          errorMessage = 'The request timed out. Please try again.';
+        } else {
+          errorMessage = `Sorry, I encountered an error: ${error.message}`;
+        }
+      }
+      
+      setMessages(prev => [...prev, { role: 'model', text: errorMessage }]);
     } finally {
       setIsLoading(false);
     }
@@ -115,13 +135,13 @@ To book, users need to click "Book Now" and select an available time slot. They 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 w-[350px] sm:w-[400px] h-[550px] max-h-[80vh] bg-hive-black border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
+            className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 sm:w-[400px] h-[80vh] sm:h-[550px] sm:max-h-[80vh] bg-hive-black border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="bg-white/5 border-b border-white/10 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center">
-                  <img src="/assistant.jpg" alt="Bot" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />
+                  <img src="/assistant.jpg" alt="Bot" loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />
                 </div>
                 <div>
                   <h3 className="text-white font-bold text-sm uppercase tracking-wider">Hive Assistant</h3>
@@ -150,7 +170,7 @@ To book, users need to click "Book Now" and select an available time slot. They 
                     "w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0",
                     msg.role === 'user' ? "bg-white/10 text-white" : "bg-white/5 border border-white/10"
                   )}>
-                    {msg.role === 'user' ? <User size={14} /> : <img src="/assistant.jpg" alt="Bot" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />}
+                    {msg.role === 'user' ? <User size={14} /> : <img src="/assistant.jpg" alt="Bot" loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />}
                   </div>
                   <div className={cn(
                     "p-3 rounded-2xl max-w-[80%] text-sm",
@@ -165,7 +185,7 @@ To book, users need to click "Book Now" and select an available time slot. They 
               {isLoading && (
                 <div className="flex gap-3 flex-row">
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <img src="/assistant.jpg" alt="Bot" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />
+                    <img src="/assistant.jpg" alt="Bot" loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-hive-yellow"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>' }} />
                   </div>
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/5 rounded-tl-sm flex items-center gap-1">
                     <div className="w-1.5 h-1.5 bg-hive-yellow rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

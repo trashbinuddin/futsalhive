@@ -12,6 +12,7 @@ import Reviews from './components/Reviews';
 import AdminLogin from './components/AdminLogin';
 import MyBookings from './components/MyBookings';
 import Legal from './components/Legal';
+import Invoice from './components/Invoice';
 import { motion, AnimatePresence } from 'motion/react';
 import { FUTSAL_HIVE_LOGO } from './lib/constants';
 import { Phone, MessageCircle } from 'lucide-react';
@@ -110,6 +111,7 @@ export default function App() {
                   <Route path="/contact" element={<div className="pt-20"><Contact /></div>} />
                   <Route path="/legal" element={<Legal />} />
                   <Route path="/my-bookings" element={<MyBookings />} />
+                  <Route path="/invoice/:id" element={<Invoice />} />
                   <Route path="/admin" element={<AdminPanel />} />
                   <Route path="/hive-admin" element={<AdminLogin />} />
                 </Routes>

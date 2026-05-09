@@ -182,6 +182,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       await deleteDoc(doc(db, 'bookings', id));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `bookings/${id}`);
+      throw error;
     }
   };
 

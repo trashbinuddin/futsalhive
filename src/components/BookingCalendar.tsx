@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { format, addDays, startOfDay, isSameDay, parseISO } from 'date-fns';
+import React, { useState, useMemo, useEffect } from 'react';
+import { format, addDays, startOfDay, isSameDay, parseISO, startOfWeek, endOfWeek } from 'date-fns';
+import { RecaptchaVerifier, linkWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking } from '../context/BookingContext';
 import { Calendar as CalendarIcon, Clock, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
@@ -34,7 +36,108 @@ export default function BookingCalendar() {
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [bookedId, setBookedId] = useState<string | null>(null);
+  const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [otpError, setOtpError] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
+  useEffect(() => {
+    // Cleanup recaptcha on unmount
+    return () => {
+      if ((window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier.clear();
+        (window as any).recaptchaVerifier = null;
+      }
+    };
+  }, []);
+
+  const handleSendOtp = async () => {
+    if (!user) return;
+    setIsSendingOtp(true);
+    setOtpError('');
+    try {
+      // Sanitize and format phone number for Bangladesh (+880)
+      let cleanPhone = phone.replace(/[^0-9+]/g, '');
+      const formatPhone = cleanPhone.startsWith('+880') ? cleanPhone : 
+                          cleanPhone.startsWith('880') ? '+' + cleanPhone :
+                          cleanPhone.startsWith('0') ? '+88' + cleanPhone :
+                          '+880' + cleanPhone;
+                          
+      if (formatPhone.length < 13 || formatPhone.length > 15) {
+        const errorMsg = 'Invalid phone number format. Please check and try again.';
+        setOtpError(errorMsg);
+        setBookingError(errorMsg);
+        setIsSendingOtp(false);
+        return;
+      }
+
+      if (!(window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible'
+        });
+      }
+      
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmationResult = await linkWithPhoneNumber(user, formatPhone, appVerifier);
+      setVerificationResult(confirmationResult);
+      setStep('otp');
+    } catch (error: any) {
+      console.error('Error sending OTP:', error);
+      
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+        } catch (e) {}
+        (window as any).recaptchaVerifier = null;
+        
+        const container = document.getElementById('recaptcha-container');
+        if (container) {
+          container.innerHTML = '';
+        }
+      }
+      
+      if (error.code === 'auth/invalid-phone-number') {
+        const errorMsg = 'Invalid phone number format. Please check and try again.';
+        setOtpError(errorMsg);
+        setBookingError(errorMsg);
+      } else if (error.code === 'auth/credential-already-in-use') {
+        const errorMsg = 'This phone number is already linked to another account.';
+        setOtpError(errorMsg);
+        setBookingError(errorMsg);
+      } else if (error.code === 'auth/billing-not-enabled' || error.message?.includes('billing')) {
+        console.warn('Firebase Billing not enabled. Falling back to simulated OTP.');
+        setVerificationResult(null); // Indicates simulated
+        setStep('otp');
+      } else {
+        const errorMsg = error.message || 'Failed to send OTP. Please try again later.';
+        setOtpError(errorMsg);
+        setBookingError(errorMsg);
+      }
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp) return;
+    setIsVerifyingOtp(true);
+    setOtpError('');
+    try {
+      if (verificationResult) {
+        await verificationResult.confirm(otp);
+      } else if (otp !== '123456' && otp !== '000000') {
+        throw new Error('Invalid OTP');
+      }
+      
+      // If simulated or success
+      setStep('payment');
+    } catch (error) {
+      console.error('OTP Verification Error:', error);
+      setOtpError('Invalid OTP code. Please try again.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
 
   const next7Days = useMemo(() => {
     return Array.from({ length: 14 }).map((_, i) => addDays(startOfDay(new Date()), i));
@@ -129,6 +232,39 @@ export default function BookingCalendar() {
   const handleBooking = async () => {
     if (!user || !selectedSlot) return;
 
+    const userBookings = bookings.filter(b => 
+      (b.userId === user.uid || b.userEmail === user.email) && 
+      b.status !== 'cancelled'
+    );
+
+    const userBookingsToday = userBookings.filter(b => b.date === format(selectedDate, 'yyyy-MM-dd')).length;
+    
+    const now = new Date().getTime();
+    const recentBooking = userBookings.find(b => {
+      if (!b.createdAt) return false;
+      let timestamp = 0;
+      if (b.createdAt?.toDate) {
+        timestamp = b.createdAt.toDate().getTime();
+      } else if (b.createdAt?.seconds) {
+        timestamp = b.createdAt.seconds * 1000;
+      } else if (typeof b.createdAt === 'string' || typeof b.createdAt === 'number') {
+        timestamp = new Date(b.createdAt).getTime();
+      }
+      return timestamp > 0 && (now - timestamp) < 24 * 60 * 60 * 1000;
+    });
+
+    if (recentBooking) {
+      setBookingError(`Limit Reached: You can only book once every 24 hours. Please try again later.`);
+      setStep('select');
+      return;
+    }
+
+    if (userBookingsToday >= 1) { // Current limit: 1 per day
+      setBookingError(`Limit Reached: You have already booked a slot for ${format(selectedDate, 'MMM dd')}. You can only book 1 per date.`);
+      setStep('select');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setBookingError(null);
@@ -190,6 +326,14 @@ export default function BookingCalendar() {
         </motion.div>
         <h2 className="text-4xl font-display font-black text-white mb-4 tracking-tighter">RESERVE YOUR ARENA</h2>
         <p className="text-white/60">Select your preferred date and time to start the game.</p>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 inline-flex items-center gap-2 bg-hive-yellow/10 border border-hive-yellow/20 text-hive-yellow px-4 py-2 rounded-full text-sm font-bold"
+        >
+          <AlertCircle className="w-4 h-4" />
+          <span>Note: You can book a maximum of 1 slot per 24 hours.</span>
+        </motion.div>
       </div>
 
       <div className="glass-card p-4 md:p-8">
@@ -252,13 +396,54 @@ export default function BookingCalendar() {
               })}
             </div>
 
+            {bookingError && step === 'select' && (
+              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm text-center">
+                {bookingError}
+              </div>
+            )}
+
             <div className="mt-10 flex justify-end">
               <button
                 disabled={!selectedSlot}
                 onClick={() => {
+                  setBookingError(null);
                   if (!user) {
                     login();
                   } else {
+                    const startWeekTime = startOfWeek(selectedDate).getTime();
+                    const endWeekTime = endOfWeek(selectedDate).getTime();
+
+                    const userBookings = bookings.filter(b => 
+                      (b.userId === user.uid || b.userEmail === user.email) && 
+                      b.status !== 'cancelled'
+                    );
+
+                    const userBookingsToday = userBookings.filter(b => b.date === format(selectedDate, 'yyyy-MM-dd')).length;
+                    
+                    const now = new Date().getTime();
+                    const recentBooking = userBookings.find(b => {
+                      if (!b.createdAt) return false;
+                      let timestamp = 0;
+                      if (b.createdAt?.toDate) {
+                        timestamp = b.createdAt.toDate().getTime();
+                      } else if (b.createdAt?.seconds) {
+                        timestamp = b.createdAt.seconds * 1000;
+                      } else if (typeof b.createdAt === 'string' || typeof b.createdAt === 'number') {
+                        timestamp = new Date(b.createdAt).getTime();
+                      }
+                      return timestamp > 0 && (now - timestamp) < 24 * 60 * 60 * 1000;
+                    });
+
+                    if (recentBooking) {
+                      setBookingError(`Limit Reached: You can only book once every 24 hours. Please try again later.`);
+                      return;
+                    }
+
+                    if (userBookingsToday >= 1) { // Current limit: 1 per day
+                      setBookingError(`Limit Reached: You have already booked a slot for ${format(selectedDate, 'MMM dd')}. You can only book 1 per date.`);
+                      return;
+                    }
+
                     setStep('confirm');
                   }
                 }}
@@ -272,6 +457,12 @@ export default function BookingCalendar() {
 
         {step === 'confirm' && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+            {bookingError && (
+              <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-500 text-xs font-bold flex items-center gap-3">
+                <AlertCircle size={16} />
+                {bookingError}
+              </div>
+            )}
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="bg-black/30 p-4 rounded-xl border border-white/10">
@@ -311,11 +502,18 @@ export default function BookingCalendar() {
                 <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4">
                   <button onClick={() => setStep('select')} className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none">Back</button>
                   <button 
-                    disabled={!phone || phone.length < 11 || !playerName.trim()}
-                    onClick={() => setStep('otp')} 
-                    className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
+                    disabled={!phone || phone.length < 11 || !playerName.trim() || isSendingOtp}
+                    onClick={handleSendOtp} 
+                    className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95 flex justify-center items-center gap-2"
                   >
-                    Verify Details
+                    {isSendingOtp ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-hive-black/20 border-t-hive-black rounded-full animate-spin" />
+                        Sending OTP...
+                      </>
+                    ) : (
+                      'Verify Details'
+                    )}
                   </button>
                 </div>
               </div>
@@ -329,7 +527,7 @@ export default function BookingCalendar() {
               <Clock size={32} />
             </div>
             <h3 className="text-2xl font-display font-bold text-white">Verification Code</h3>
-            <p className="text-white/60 text-sm">We've sent a 6-digit code to {phone}. <br/> (Simulated: Enter 123456)</p>
+            <p className="text-white/60 text-sm">We've sent a 6-digit code to {phone}. <br/> (Simulated: Enter 123456 or 000000)</p>
             
             <input 
               type="text"
@@ -339,15 +537,25 @@ export default function BookingCalendar() {
               placeholder="000000"
               className="w-48 mx-auto block bg-black/30 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-display font-bold text-hive-yellow tracking-[0.5em] focus:outline-none focus:border-hive-yellow transition-colors"
             />
+            {otpError && (
+              <p className="text-red-500 font-bold text-sm bg-red-500/10 border border-red-500/20 py-2 rounded-lg max-w-sm mx-auto">{otpError}</p>
+            )}
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4 pt-4 max-w-sm mx-auto">
               <button onClick={() => setStep('confirm')} className="w-full sm:flex-1 text-gray-400 font-bold hover:text-white transition-colors py-4 sm:py-0 text-sm uppercase tracking-wider bg-white/5 sm:bg-transparent rounded-xl sm:rounded-none">Back</button>
               <button 
-                disabled={otp !== '123456'}
-                onClick={() => setStep('payment')} 
-                className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95"
+                disabled={otp.length !== 6 || isVerifyingOtp}
+                onClick={handleVerifyOtp} 
+                className="w-full sm:flex-[2] bg-hive-yellow text-hive-black py-4 rounded-xl font-black uppercase tracking-wider disabled:opacity-50 transition-transform active:scale-95 flex items-center justify-center gap-2"
               >
-                Verify & Pay
+                {isVerifyingOtp ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-hive-black/20 border-t-hive-black rounded-full animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  'Verify & Pay'
+                )}
               </button>
             </div>
           </motion.div>
@@ -446,15 +654,17 @@ export default function BookingCalendar() {
             </div>
 
             <div className="bg-black/30 p-6 rounded-2xl border border-white/10 space-y-4">
-              <p className="text-sm text-white/60">
+              <div className="text-sm text-white/60">
                 Send <strong>৳{advanceAmount}</strong> to: <br/>
-                <a 
-                  href="tel:+8801894433325"
-                  className="text-xl font-black text-white mt-1 block hover:text-hive-yellow transition-colors"
-                >
-                  +880 1894 43 3325 (Personal)
-                </a>
-              </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span 
+                    className="text-xl font-black text-white block select-all cursor-text py-1"
+                  >
+                    01894433325
+                  </span>
+                  <span className="text-sm font-bold text-white/50">(Personal)</span>
+                </div>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -540,6 +750,7 @@ export default function BookingCalendar() {
             </button>
           </motion.div>
         )}
+        <div id="recaptcha-container"></div>
       </div>
     </div>
   );

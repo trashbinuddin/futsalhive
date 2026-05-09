@@ -53,12 +53,12 @@ function GalleryImageCard({ img, delayIndex }: { img: any; delayIndex: number; k
         loading="lazy"
         onLoad={() => setIsLoaded(true)}
         referrerPolicy="no-referrer"
-        className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-1 grayscale group-hover:grayscale-0 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-1 md:grayscale group-hover:grayscale-0 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-hive-black via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-t from-hive-black via-transparent to-transparent opacity-60 md:opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
-      <div className="absolute bottom-0 left-0 right-0 p-8 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-        <span className="text-[10px] font-black text-hive-yellow uppercase tracking-[0.3em] mb-2 block opacity-0 group-hover:opacity-100 transition-opacity delay-100">
+      <div className="absolute bottom-0 left-0 right-0 p-8 translate-y-0 md:translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+        <span className="text-[10px] font-black text-hive-yellow uppercase tracking-[0.3em] mb-2 block opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity delay-100">
           {img.category}
         </span>
         <h3 className="text-2xl font-display font-black text-white uppercase tracking-tighter">
@@ -66,7 +66,7 @@ function GalleryImageCard({ img, delayIndex }: { img: any; delayIndex: number; k
         </h3>
       </div>
 
-      <div className="absolute top-6 right-6 w-10 h-10 rounded-full bg-hive-yellow/90 flex items-center justify-center text-hive-black opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0">
+      <div className="absolute top-6 right-6 w-10 h-10 rounded-full bg-hive-yellow/90 flex items-center justify-center text-hive-black opacity-100 md:opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-0 md:translate-x-4 group-hover:translate-x-0">
         <Zap size={20} />
       </div>
     </motion.div>

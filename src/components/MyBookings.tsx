@@ -1,18 +1,36 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking } from '../context/BookingContext';
-import { Calendar as CalendarIcon, Clock, CreditCard, ChevronRight, X, AlertCircle, CheckCircle2, History } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CreditCard, ChevronRight, X, AlertCircle, CheckCircle2, History, FileText, CalendarPlus } from 'lucide-react';
 import { format, isBefore, isAfter, parseISO, startOfDay } from 'date-fns';
 import { cn, formatTime12h } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, Navigate } from 'react-router-dom';
 import { FUTSAL_HIVE_LOGO } from '../lib/constants';
 
+const addToGoogleCalendar = (booking: Booking) => {
+  const formatDateTime = (dateStr: string, timeStr: string) => {
+    return `${dateStr.replace(/-/g, '')}T${timeStr.replace(':', '')}00`;
+  };
+
+  const start = formatDateTime(booking.date, booking.startTime);
+  const end = formatDateTime(booking.date, booking.endTime);
+  const title = "Futsal Hive Booking";
+  const details = `Futsal match at Futsal Hive.\nBooking ID: #${booking.id.slice(-6).toUpperCase()}\nAmount Paid: BDT ${booking.advanceAmount || 0}`;
+  const location = "Futsal Hive";
+
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
+  window.open(url, '_blank');
+};
+
 export default function MyBookings() {
   const { user, loading: authLoading } = useAuth();
   const { bookings, updateBookingStatus, loading: bookingsLoading } = useBooking();
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const myBookings = useMemo(() => {
     if (!user) return [];
@@ -33,18 +51,24 @@ export default function MyBookings() {
     });
   }, [myBookings, filter]);
 
-  if (authLoading || bookingsLoading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-12 h-12 border-4 border-hive-yellow border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  if (!authLoading && !user) return <Navigate to="/" replace />;
 
-  if (!user) return <Navigate to="/" replace />;
+  const handleCancelClick = (id: string) => {
+    setConfirmCancelId(id);
+    setCancelError(null);
+  }
 
-  const handleCancel = async (id: string) => {
-    if (window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
+  const confirmCancel = async (id: string) => {
+    setIsCancelling(true);
+    setCancelError(null);
+    try {
       await updateBookingStatus(id, 'cancelled');
+      setConfirmCancelId(null);
       setSelectedBooking(null);
+    } catch (err: any) {
+      setCancelError(err.message || String(err));
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -73,11 +97,11 @@ export default function MyBookings() {
           </div>
         </motion.div>
 
-        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md">
+        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md overflow-x-auto w-full md:w-auto snap-x">
           <button 
             onClick={() => setFilter('all')}
             className={cn(
-              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              "whitespace-nowrap shrink-0 snap-start px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
               filter === 'all' ? "bg-hive-yellow text-hive-black shadow-lg shadow-hive-yellow/20" : "text-white/40 hover:text-white"
             )}
           >
@@ -86,7 +110,7 @@ export default function MyBookings() {
           <button 
             onClick={() => setFilter('upcoming')}
             className={cn(
-              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              "whitespace-nowrap shrink-0 snap-start px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
               filter === 'upcoming' ? "bg-hive-yellow text-hive-black shadow-lg shadow-hive-yellow/20" : "text-white/40 hover:text-white"
             )}
           >
@@ -95,7 +119,7 @@ export default function MyBookings() {
           <button 
             onClick={() => setFilter('past')}
             className={cn(
-              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              "whitespace-nowrap shrink-0 snap-start px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
               filter === 'past' ? "bg-hive-yellow text-hive-black shadow-lg shadow-hive-yellow/20" : "text-white/40 hover:text-white"
             )}
           >
@@ -106,7 +130,17 @@ export default function MyBookings() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
-          {filteredBookings.length > 0 ? (
+          {authLoading || bookingsLoading ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-24"
+            >
+              <div className="w-12 h-12 border-4 border-hive-yellow border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-white/40 font-bold uppercase tracking-[0.2em] text-[10px]">Loading battles...</p>
+            </motion.div>
+          ) : filteredBookings.length > 0 ? (
             filteredBookings.map((booking, index) => (
               <motion.div
                 key={booking.id}
@@ -119,7 +153,12 @@ export default function MyBookings() {
               >
                 <div 
                   onClick={() => setSelectedBooking(booking)}
-                  className="glass-card p-6 cursor-pointer border-white/5 hover:border-hive-yellow/30 transition-all group-hover:translate-y-[-4px] relative z-10"
+                  className={cn(
+                    "p-6 cursor-pointer border transition-all group-hover:translate-y-[-4px] relative z-10 rounded-2xl backdrop-blur-md",
+                    (isBefore(parseISO(booking.date), startOfDay(new Date())) && booking.date !== format(startOfDay(new Date()), 'yyyy-MM-dd'))
+                      ? "bg-white/5 border-white/5 hover:border-white/20 grayscale-[0.8] opacity-80"
+                      : "bg-hive-yellow/5 border-hive-yellow/10 hover:border-hive-yellow/40 shadow-lg shadow-hive-yellow/5"
+                  )}
                 >
                   <div className="flex justify-between items-start mb-6">
                     <div className={cn(
@@ -160,13 +199,24 @@ export default function MyBookings() {
                     </div>
                   </div>
 
-                  <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
-                    <div>
+                  <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="text-[9px] text-white/30 uppercase font-bold tracking-widest">Total Price</p>
                       <p className="text-xl font-display font-black text-white">৳{booking.price}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/20 group-hover:text-hive-yellow group-hover:border-hive-yellow/50 transition-all">
-                      <ChevronRight size={20} />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(isAfter(parseISO(booking.date), startOfDay(new Date())) || booking.date === format(startOfDay(new Date()), 'yyyy-MM-dd')) && booking.status !== 'cancelled' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); addToGoogleCalendar(booking); }}
+                          className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-hive-yellow/10 text-hive-yellow hover:bg-hive-yellow hover:text-hive-black transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                          title="Add to Calendar"
+                        >
+                          <CalendarPlus size={16} /> <span className="hidden sm:inline">Calendar</span>
+                        </button>
+                      )}
+                      <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/20 group-hover:text-hive-yellow group-hover:border-hive-yellow/50 transition-all shrink-0">
+                        <ChevronRight size={20} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -206,86 +256,125 @@ export default function MyBookings() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-xl bg-hive-black border border-white/10 rounded-[32px] overflow-hidden shadow-2xl"
+              className="relative w-full max-w-xl bg-hive-black border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 md:p-12">
-                <div className="flex justify-between items-start mb-12">
+              <div className="p-5 sm:p-8 md:p-12 overflow-y-auto w-full">
+                <div className="flex justify-between items-start mb-6 md:mb-10">
                   <div>
-                    <h2 className="text-3xl font-display font-black text-white uppercase tracking-tighter mb-2">Booking Details</h2>
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.3em] flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter mb-1">Booking Details</h2>
+                    <p className="text-[9px] sm:text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] flex items-center gap-1 sm:gap-2">
                        Arena Access Verified <CheckCircle2 size={12} className="text-hive-yellow" />
                     </p>
                   </div>
                   <button 
                     onClick={() => setSelectedBooking(null)}
-                    className="p-3 bg-white/5 rounded-2xl text-white/40 hover:text-white hover:bg-white/10 transition-all border border-white/5"
+                    className="p-2 sm:p-3 bg-white/5 rounded-xl sm:rounded-2xl text-white/40 hover:text-white hover:bg-white/10 transition-all border border-white/5 shrink-0"
                   >
-                    <X size={20} />
+                    <X size={18} />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow">
-                        <CalendarIcon size={24} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-8 mb-8 md:mb-12">
+                  <div className="space-y-5 sm:space-y-6">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow shrink-0">
+                        <CalendarIcon size={20} />
                       </div>
                       <div>
-                        <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Play Date</p>
-                        <p className="text-white font-bold">{format(parseISO(selectedBooking.date), 'EEEE, MMM dd, yyyy')}</p>
+                        <p className="text-[9px] sm:text-[10px] text-white/30 uppercase font-black tracking-widest">Play Date</p>
+                        <p className="text-sm sm:text-base text-white font-bold">{format(parseISO(selectedBooking.date), 'EEEE, MMM dd, yyyy')}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow">
-                        <Clock size={24} />
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow shrink-0">
+                        <Clock size={20} />
                       </div>
                       <div>
-                        <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Time Slot</p>
-                        <p className="text-white font-bold">{formatTime12h(selectedBooking.startTime)} - {formatTime12h(selectedBooking.endTime)}</p>
+                        <p className="text-[9px] sm:text-[10px] text-white/30 uppercase font-black tracking-widest">Time Slot</p>
+                        <p className="text-sm sm:text-base text-white font-bold">{formatTime12h(selectedBooking.startTime)} - {formatTime12h(selectedBooking.endTime)}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow">
-                        <CreditCard size={24} />
+                  <div className="space-y-5 sm:space-y-6">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow shrink-0">
+                        <CreditCard size={20} />
                       </div>
-                      <div>
-                        <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Transaction Status</p>
-                        <p className="text-white font-bold uppercase text-xs">{selectedBooking.status}</p>
-                        {selectedBooking.transactionId && <p className="text-[8px] text-white/20 font-mono mt-1">{selectedBooking.transactionId}</p>}
+                      <div className="min-w-0">
+                        <p className="text-[9px] sm:text-[10px] text-white/30 uppercase font-black tracking-widest">Transaction Status</p>
+                        <p className="text-white font-bold uppercase text-xs sm:text-sm">{selectedBooking.status}</p>
+                        {selectedBooking.transactionId && <p className="text-[8px] text-white/20 font-mono mt-1 break-all">{selectedBooking.transactionId}</p>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow">
-                        <AlertCircle size={24} />
+                    <div className="flex items-center gap-3 sm:gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-hive-yellow/10 flex items-center justify-center text-hive-yellow shrink-0">
+                        <AlertCircle size={20} />
                       </div>
                       <div>
-                        <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Payment Info</p>
-                        <p className="text-white font-bold">৳{selectedBooking.advanceAmount} Paid</p>
-                        <p className="text-hive-yellow text-[10px] font-black uppercase mt-1">Due: ৳{selectedBooking.price - (selectedBooking.advanceAmount || 0)}</p>
+                        <p className="text-[9px] sm:text-[10px] text-white/30 uppercase font-black tracking-widest">Payment Info</p>
+                        <p className="text-sm sm:text-base text-white font-bold">৳{selectedBooking.advanceAmount} Paid</p>
+                        <p className="text-hive-yellow text-[9px] sm:text-[10px] font-black uppercase mt-1">Due: ৳{selectedBooking.price - (selectedBooking.advanceAmount || 0)}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4">
-                  {selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'paid' && (
-                    <button 
-                      onClick={() => handleCancel(selectedBooking.id)}
-                      className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                {cancelError && (
+                  <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-xs flex items-center justify-center text-center">
+                    {cancelError}
+                  </div>
+                )}
+                
+                {confirmCancelId === selectedBooking.id ? (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-center text-red-500 font-bold text-sm mb-2">Are you sure? This cannot be undone.</p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button 
+                        onClick={() => confirmCancel(selectedBooking.id)}
+                        disabled={isCancelling}
+                        className="flex-1 bg-red-600 text-white py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isCancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                      </button>
+                      <button 
+                        onClick={() => setConfirmCancelId(null)}
+                        disabled={isCancelling}
+                        className="flex-1 bg-white/5 border border-white/10 text-white py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-white/10 transition-all"
+                      >
+                        Nevermind
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {!(isBefore(parseISO(selectedBooking.date), startOfDay(new Date())) && selectedBooking.date !== format(startOfDay(new Date()), 'yyyy-MM-dd')) && selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'paid' && (
+                      <button 
+                        onClick={() => handleCancelClick(selectedBooking.id)}
+                        className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <X size={18} /> Cancel Booking
+                      </button>
+                    )}
+                    <Link 
+
+                      to={`/invoice/${selectedBooking.id}`}
+                      className="flex-1 bg-hive-yellow/10 border border-hive-yellow/20 text-hive-yellow py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-hive-yellow hover:text-hive-black transition-all flex items-center justify-center gap-2"
                     >
-                      <X size={18} /> Cancel Booking
+                      <FileText size={18} /> View Invoice
+                    </Link>
+                    <button 
+                      onClick={() => {
+                        setSelectedBooking(null);
+                        setConfirmCancelId(null);
+                        setCancelError(null);
+                      }}
+                      className="flex-1 bg-white/5 border border-white/10 text-white py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest hover:bg-white/10 transition-all shadow-xl shadow-black/40"
+                    >
+                      Close
                     </button>
-                  )}
-                  <button 
-                    onClick={() => setSelectedBooking(null)}
-                    className="flex-1 bg-white/5 border border-white/10 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-white/10 transition-all shadow-xl shadow-black/40"
-                  >
-                    Close
-                  </button>
-                </div>
+                  </div>
+                )}
                 
                 <p className="text-center mt-8 text-[9px] text-white/20 font-bold uppercase tracking-[0.2em]">
                   Please arrive 15 minutes early for your session.

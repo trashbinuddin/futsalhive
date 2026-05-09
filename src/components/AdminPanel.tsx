@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useBooking, Booking, Pricing } from '../context/BookingContext';
 import { useGallery } from '../context/GalleryContext';
-import { Check, X, Clock, DollarSign, Calendar as CalendarIcon, Filter, Users, CreditCard, Edit2, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
+import { Check, X, Clock, DollarSign, Calendar as CalendarIcon, Filter, Users, CreditCard, Edit2, Image as ImageIcon, Upload, Trash2, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatTime12h } from '../lib/utils';
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 
 export default function AdminPanel() {
   const { user: currentUser, role, superAdminEmail, updateSuperAdmin, loading: authLoading } = useAuth();
@@ -15,6 +15,8 @@ export default function AdminPanel() {
   const { images, addImage, deleteImage, loading: galleryLoading } = useGallery();
   const [activeTab, setActiveTab] = useState<'bookings' | 'pricing' | 'team' | 'coupons' | 'gallery'>('bookings');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [startDateFilter, setStartDateFilter] = useState<string>('');
+  const [endDateFilter, setEndDateFilter] = useState<string>('');
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,7 +54,28 @@ export default function AdminPanel() {
 
   const filteredBookings = bookings
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-    .filter(b => statusFilter === 'all' || b.status === statusFilter);
+    .filter(b => statusFilter === 'all' || b.status === statusFilter)
+    .filter(b => {
+      if (!startDateFilter && !endDateFilter) return true;
+      const bookingDate = new Date(b.date);
+      bookingDate.setHours(0, 0, 0, 0);
+
+      let isAfterStart = true;
+      if (startDateFilter) {
+        const start = new Date(startDateFilter);
+        start.setHours(0, 0, 0, 0);
+        isAfterStart = bookingDate >= start;
+      }
+
+      let isBeforeEnd = true;
+      if (endDateFilter) {
+        const end = new Date(endDateFilter);
+        end.setHours(0, 0, 0, 0);
+        isBeforeEnd = bookingDate <= end;
+      }
+
+      return isAfterStart && isBeforeEnd;
+    });
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
     try {
@@ -156,17 +179,32 @@ export default function AdminPanel() {
           </div>
 
           {activeTab === 'bookings' && (
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest focus:outline-none focus:border-hive-yellow"
-            >
-              <option value="all">All Real-time</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="paid">Paid</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-2">
+              <input 
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest focus:outline-none focus:border-hive-yellow [color-scheme:dark]"
+              />
+              <span className="text-white/40 text-[10px] font-black uppercase">To</span>
+              <input 
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest focus:outline-none focus:border-hive-yellow [color-scheme:dark]"
+              />
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black text-white uppercase tracking-widest focus:outline-none focus:border-hive-yellow"
+              >
+                <option value="all">All Real-time</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="paid">Paid</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
           )}
         </div>
       </div>
@@ -179,8 +217,15 @@ export default function AdminPanel() {
             </div>
           ) : (
             filteredBookings.map((booking) => (
-              <div key={booking.id} className="glass-card overflow-hidden group border-white/5 hover:border-white/10 transition-all">
-                <div className="p-6 md:p-8 flex flex-col lg:flex-row gap-8">
+              <div key={booking.id} className={cn(
+                "glass-card overflow-hidden group transition-all relative border-l-4",
+                booking.status === 'pending' ? "border-l-hive-yellow bg-hive-yellow/5 hover:bg-hive-yellow/10 border-white/5 hover:border-white/10" :
+                booking.status === 'confirmed' ? "border-l-green-500 bg-green-500/5 hover:bg-green-500/10 border-white/5 hover:border-white/10" :
+                booking.status === 'paid' ? "border-l-blue-500 bg-blue-500/5 hover:bg-blue-500/10 border-white/5 hover:border-white/10" :
+                booking.status === 'cancelled' ? "border-l-red-500 bg-red-500/5 hover:bg-red-500/10 border-white/5 hover:border-white/10" :
+                "border-l-transparent border-white/5 hover:border-white/10"
+              )}>
+                <div className="p-6 md:p-8 flex flex-col lg:flex-row gap-8 relative z-10">
                   {/* User & Status Column */}
                   <div className="lg:w-1/4 space-y-4">
                     <div className="flex items-center gap-3">
@@ -224,10 +269,10 @@ export default function AdminPanel() {
 
                     <div className="space-y-4">
                       <div className="flex items-center gap-3">
-                        <CreditCard size={16} className="text-hive-yellow" />
-                        <div>
+                        <CreditCard size={16} className="text-hive-yellow shrink-0" />
+                        <div className="min-w-0">
                           <p className="text-[10px] text-white/30 uppercase font-black">Payment ({booking.paymentMethod?.toUpperCase() || 'N/A'})</p>
-                          <p className="text-white font-mono text-xs font-bold">{booking.transactionId || 'No Transaction ID'}</p>
+                          <p className="text-white font-mono text-xs font-bold break-all">{booking.transactionId || 'No Transaction ID'}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -282,16 +327,12 @@ export default function AdminPanel() {
                         Restore
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        if(window.confirm('Are you sure you want to permanently delete this booking?')) {
-                          deleteBooking(booking.id);
-                        }
-                      }}
-                      className="flex-1 bg-red-500/10 border border-red-500/20 text-red-500 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                    <Link 
+                      to={`/invoice/${booking.id}`}
+                      className="flex-1 bg-hive-yellow/10 border border-hive-yellow/20 text-hive-yellow font-black text-[10px] uppercase tracking-widest py-3 rounded-xl hover:bg-hive-yellow hover:text-hive-black transition-all flex items-center justify-center gap-2"
                     >
-                      <Trash2 size={14} /> Delete
-                    </button>
+                      <FileText size={14} /> Invoice
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -312,17 +353,17 @@ export default function AdminPanel() {
               <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Showing only authorized team members chosen by admins</p>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <input 
                 type="email"
                 value={newTeamEmail}
                 onChange={(e) => setNewTeamEmail(e.target.value)}
                 placeholder="Manager/Staff Email"
-                className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-hive-yellow w-48 md:w-64"
+                className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 sm:py-2 text-xs text-white focus:outline-none focus:border-hive-yellow w-full md:w-64"
               />
               <button 
                 onClick={handleAddToTeam}
-                className="bg-hive-yellow text-hive-black px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all"
+                className="bg-hive-yellow text-hive-black px-6 py-3 sm:py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all whitespace-nowrap"
               >
                 ADD TO TEAM
               </button>
@@ -331,21 +372,21 @@ export default function AdminPanel() {
 
           <div className="grid gap-4">
             {users.filter(u => teamWhitelist.includes(u.email?.toLowerCase()) || u.email === superAdminEmail).map((user) => (
-              <div key={user.id} className="glass-card p-6 flex items-center justify-between group border-white/5 hover:border-white/10 transition-all">
+              <div key={user.id} className="glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 group border-white/5 hover:border-white/10 transition-all">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 flex items-center justify-center border border-white/5 relative overflow-hidden">
+                  <div className="w-12 h-12 rounded-2xl bg-hive-yellow/10 shrink-0 flex items-center justify-center border border-white/5 relative overflow-hidden">
                     <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                   </div>
-                  <div>
-                    <div className="text-white font-black uppercase tracking-tighter flex items-center gap-2">
-                      {user.displayName || 'Unnamed Player'}
-                      {user.email === superAdminEmail && <span className="text-[8px] bg-hive-yellow text-hive-black px-1.5 py-0.5 rounded font-black">SUPER</span>}
+                  <div className="min-w-0">
+                    <div className="text-white font-black uppercase tracking-tighter flex items-center gap-2 truncate">
+                      <span className="truncate">{user.displayName || 'Unnamed Player'}</span>
+                      {user.email === superAdminEmail && <span className="text-[8px] bg-hive-yellow text-hive-black px-1.5 py-0.5 rounded font-black shrink-0">SUPER</span>}
                     </div>
-                    <div className="text-[10px] text-white/40 font-medium uppercase tracking-widest">{user.email}</div>
+                    <div className="text-[10px] text-white/40 font-medium uppercase tracking-widest truncate">{user.email}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 self-end md:self-auto">
                   <select 
                     value={user.role}
                     disabled={user.email === superAdminEmail || user.id === currentUser?.uid}
@@ -453,19 +494,19 @@ function CouponManager({ coupons }: { coupons: any[] }) {
       <div className="lg:col-span-2 space-y-4">
         {coupons.map((c) => (
           <div key={c.id} className={cn(
-            "glass-card p-6 flex items-center justify-between border-white/5",
+            "glass-card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-white/5",
             !c.isActive && "opacity-50 grayscale"
           )}>
-            <div className="flex items-center gap-6">
-              <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-hive-yellow">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-10 h-10 rounded-lg bg-white/5 shrink-0 flex items-center justify-center text-hive-yellow">
                 <CreditCard size={20} />
               </div>
-              <div>
-                <div className="text-white font-black uppercase tracking-widest">{c.code}</div>
-                <div className="text-[10px] text-gray-500 uppercase font-bold">Discount: ৳{c.discount}</div>
+              <div className="min-w-0">
+                <div className="text-white font-black uppercase tracking-widest truncate">{c.code}</div>
+                <div className="text-[10px] text-gray-500 uppercase font-bold truncate">Discount: ৳{c.discount}</div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 self-start sm:self-auto">
               <button 
                 onClick={() => toggleCoupon(c.id, c.isActive)}
                 className={cn(
@@ -528,6 +569,43 @@ function CouponManager({ coupons }: { coupons: any[] }) {
 function PricingManager({ pricing }: { pricing: Pricing[] }) {
   const [newPrice, setNewPrice] = useState({ dayType: 'weekday', startTime: '18:00', endTime: '19:00', price: 1500 });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleResetToDefaultPricing = async () => {
+    if (!window.confirm('This will delete all current pricing rules and restore the system defaults. Continue?')) return;
+    
+    try {
+      // 1. Delete all current rules
+      for (const p of pricing) {
+        await deleteDoc(doc(db, 'pricing', p.id));
+      }
+      
+      // 2. Add defaults
+      const defaults = [
+        { dayType: 'weekday', startTime: '06:00', endTime: '16:30', price: 2100 },
+        { dayType: 'weekend', startTime: '06:00', endTime: '16:30', price: 3000 },
+        { dayType: 'weekday', startTime: '16:30', endTime: '18:00', price: 3000 },
+        { dayType: 'weekend', startTime: '16:30', endTime: '18:00', price: 3600 },
+        { dayType: 'weekday', startTime: '18:00', endTime: '02:00', price: 3600 },
+        { dayType: 'weekend', startTime: '18:00', endTime: '02:00', price: 4000 },
+        { dayType: 'everyday', startTime: '02:00', endTime: '06:00', price: 1500 }
+      ];
+      
+      for (const rule of defaults) {
+        await addDoc(collection(db, 'pricing'), rule);
+      }
+      
+      showNotification('Default pricing restored successfully!', 'success');
+    } catch (error) {
+      console.error("Error resetting pricing:", error);
+      showNotification('Failed to reset pricing rules.', 'error');
+    }
+  };
 
   const handleAddPricing = async () => {
     if (editingId) {
@@ -550,26 +628,36 @@ function PricingManager({ pricing }: { pricing: Pricing[] }) {
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-8">
+    <div className="grid lg:grid-cols-3 gap-8 relative">
+      {notification && (
+        <div className={cn("fixed top-32 right-1/2 translate-x-1/2 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-[100] animate-in fade-in slide-in-from-top-4 backdrop-blur-md", 
+          notification.type === 'success' ? "bg-green-500/20 border border-green-500/30 text-green-400" : "bg-red-500/20 border border-red-500/30 text-red-400"
+        )}>
+          {notification.type === 'success' ? <Check size={20} /> : <X size={20} />}
+          <span className="font-bold text-sm tracking-wider">{notification.message}</span>
+        </div>
+      )}
       <div className="lg:col-span-2 space-y-4">
         {pricing.map((p) => (
-          <div key={p.id} className={cn("glass-card p-6 flex items-center justify-between", editingId === p.id && "border-hive-yellow")}>
-            <div className="flex items-center gap-6">
-              <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-hive-yellow">
-                <Clock size={20} />
-              </div>
-              <div>
-                <div className="text-white font-bold capitalize">
-                  {p.dayType === 'everyday' ? 'Everyday' 
-                    : p.dayType === 'weekday' ? 'Weekday (Sun-Thu)' 
-                    : p.dayType === 'weekend' ? 'Weekend (Fri-Sat)' 
-                    : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseInt(p.dayType)] || p.dayType}
+          <div key={p.id} className={cn("glass-card p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4", editingId === p.id && "border-hive-yellow")}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 w-full">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-white/5 shrink-0 flex items-center justify-center text-hive-yellow">
+                  <Clock size={20} />
                 </div>
-                <div className="text-sm text-gray-500">{p.startTime} - {p.endTime}</div>
+                <div className="min-w-0">
+                  <div className="text-white font-bold capitalize truncate">
+                    {p.dayType === 'everyday' ? 'Everyday' 
+                      : p.dayType === 'weekday' ? 'Weekday (Sun-Thu)' 
+                      : p.dayType === 'weekend' ? 'Weekend (Fri-Sat)' 
+                      : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseInt(p.dayType)] || p.dayType}
+                  </div>
+                  <div className="text-sm text-gray-500 truncate">{p.startTime} - {p.endTime}</div>
+                </div>
               </div>
               <div className="text-2xl font-display font-black text-hive-yellow">৳{p.price}</div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 self-start sm:self-auto shrink-0">
               <button onClick={() => startEdit(p)} className="p-2 text-hive-yellow/50 hover:text-hive-yellow transition-colors bg-white/5 rounded-lg border border-white/5">
                 <Edit2 size={16} />
               </button>
@@ -655,6 +743,9 @@ function PricingManager({ pricing }: { pricing: Pricing[] }) {
               {editingId ? 'Save Update' : 'Add Pricing Rule'}
             </button>
           </div>
+          <button onClick={handleResetToDefaultPricing} className="w-full bg-red-500/10 text-red-500 hover:bg-red-500/20 py-4 rounded-xl font-black text-xs uppercase tracking-wider mt-2 transition-all">
+            Reset to Default Pricing
+          </button>
         </div>
       </div>
     </div>
@@ -670,15 +761,45 @@ function GalleryManager({ images, addImage, deleteImage, loading }: any) {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Quick validation 
-    if (file.size > 1024 * 1024) {
-      alert("Please choose an image smaller than 1MB.");
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
-      setBase64File(event.target?.result as string);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Max dimensions
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress as JPEG at 70% quality to ensure small base64 string
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setBase64File(compressedBase64);
+        } else {
+          setBase64File(event.target?.result as string);
+        }
+      };
+      if (event.target?.result) {
+        img.src = event.target.result as string;
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -690,9 +811,9 @@ function GalleryManager({ images, addImage, deleteImage, loading }: any) {
       await addImage(base64File, newImage.title.trim(), newImage.category.trim());
       setNewImage({ title: '', category: '' });
       setBase64File('');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to upload. Try again.");
+      alert(`Failed to upload. ${e?.message || 'Try again.'}`);
     } finally {
       setIsUploading(false);
     }
@@ -709,14 +830,14 @@ function GalleryManager({ images, addImage, deleteImage, loading }: any) {
              No images uploaded. Add some to the right to feature them on the main page.
            </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             {images.map((img: any) => (
                <div key={img.id} className="glass-card border-white/5 overflow-hidden group">
                  <div className="aspect-[4/3] bg-black relative">
                    <img src={img.url} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={img.title} />
                    <button 
                      onClick={() => deleteImage(img.id)}
-                     className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
+                     className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:scale-110 transition-transform opacity-100 md:opacity-0 group-hover:opacity-100"
                      title="Delete Image"
                    >
                      <Trash2 size={14} />
@@ -739,7 +860,7 @@ function GalleryManager({ images, addImage, deleteImage, loading }: any) {
             <h3 className="text-xl font-display font-black text-hive-yellow uppercase tracking-tighter flex items-center gap-2">
               <Upload size={20} /> Add Image
             </h3>
-            <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Max limit 1MB per image</p>
+            <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Images will be automatically resized for web</p>
           </div>
 
           <div className="space-y-4">

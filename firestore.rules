@@ -53,15 +53,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        ((request.auth.token.email == 'futsalhivebd@gmail.com') ||
+         (exists(/databases/$(database)/documents/config/main) && request.auth.token.email == get(/databases/$(database)/documents/config/main).data.superAdminEmail));
+    }
+
     function isAdmin() {
       return isAuthenticated() && 
         ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-         (request.auth.token.email == 'imtiajulrivu@gmail.com' && request.auth.token.email_verified == true) ||
-         (exists(/databases/$(database)/documents/config/main) && request.auth.token.email == get(/databases/$(database)/documents/config/main).data.superAdminEmail && request.auth.token.email_verified == true));
+         (request.auth.token.email == 'futsalhivebd@gmail.com') ||
+         (exists(/databases/$(database)/documents/config/main) && request.auth.token.email == get(/databases/$(database)/documents/config/main).data.superAdminEmail));
     }
 
     function isModerator() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
     }
 
     function isStaff() {
@@ -128,10 +134,10 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
-                      (request.resource.data.role == 'user' || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == uid && isValidUser(request.resource.data) && 
+                      (request.resource.data.role in ['user', 'moderator'] || isAdmin());
       allow update: if isOwner(uid) && isValidUser(request.resource.data) && 
-                      request.resource.data.role == resource.data.role || isAdmin();
+                      (request.resource.data.role == resource.data.role || isAdmin());
       allow delete: if isAdmin() && resource.data.email != get(/databases/$(database)/documents/config/main).data.superAdminEmail && uid != request.auth.uid;
     }
 
@@ -142,8 +148,8 @@ service cloud.firestore {
 
     match /config/{configId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.token.email == 'imtiajulrivu@gmail.com' && request.auth.token.email_verified == true;
-      allow update: if isAuthenticated() && (request.auth.token.email == resource.data.superAdminEmail || request.auth.token.email == 'imtiajulrivu@gmail.com') && request.auth.token.email_verified == true;
+      allow create: if isAuthenticated() && request.auth.token.email == 'futsalhivebd@gmail.com';
+      allow update: if isAuthenticated() && (request.auth.token.email == resource.data.superAdminEmail || request.auth.token.email == 'futsalhivebd@gmail.com');
     }
 
     match /bookings/{bookingId} {
@@ -156,12 +162,12 @@ service cloud.firestore {
                       
       allow update: if isAuthenticated() && isValidBooking(request.resource.data) && 
                       (
-                        (isOwner(resource.data.userId) && 
+                        (request.auth.uid == resource.data.userId && 
                          request.resource.data.userId == resource.data.userId &&
                          (request.resource.data.status == 'cancelled' || request.resource.data.status == resource.data.status)) ||
                         isStaff()
                       );
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     match /coupons/{couponId} {
